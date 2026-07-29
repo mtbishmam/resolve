@@ -1,0 +1,116 @@
+import { describe, expect, it } from "vitest";
+import { CaptureSchema, TranscriptMessageSchema } from "@/lib/contracts";
+import { expectedSourceFilename, normalizeProblemUrl } from "@/lib/identity";
+import {
+  INITIAL_INTERVALS,
+  SCHEDULE_VERSION,
+  nextReviewDate,
+} from "@/lib/schedule";
+import { sanitizeStatementMarkdown } from "@/lib/sanitize";
+
+describe("canonical problem identity", () => {
+  it.each([
+    ["https://codeforces.com/contest/1554/problem/B", "codeforces", "1554:B"],
+    [
+      "https://codeforces.com/problemset/problem/1554/B?locale=en",
+      "codeforces",
+      "1554:B",
+    ],
+    ["https://cses.fi/problemset/task/1668/", "cses", "1668"],
+  ])("normalizes %s", (url, platform, problemKey) => {
+    expect(normalizeProblemUrl(url)).toMatchObject({ platform, problemKey });
+  });
+
+  it("rejects CSES result URLs because the result id is not a problem id", () => {
+    expect(() =>
+      normalizeProblemUrl("https://cses.fi/problemset/result/14841190/"),
+    ).toThrow("Unsupported CSES problem URL");
+  });
+
+  it("derives source names without using them as identity", () => {
+    expect(
+      expectedSourceFilename({
+        platform: "codeforces",
+        problemKey: "1554:B",
+        title: "Cobb",
+      }),
+    ).toBe("1554B.cpp");
+    expect(
+      expectedSourceFilename({
+        platform: "cses",
+        problemKey: "1668",
+        title: "Building Teams",
+      }),
+    ).toBe("Building_Teams.cpp");
+  });
+});
+
+describe("capture safety", () => {
+  it("preserves TeX, strips HTML, and absolutizes image URLs", () => {
+    const input =
+      "<script>ignore()</script>\nLet $x^2$ work.\n![plot](/images/a.png)";
+    const sanitized = sanitizeStatementMarkdown(
+      input,
+      "https://codeforces.com/contest/1/problem/A",
+    );
+    expect(sanitized).not.toContain("<script>");
+    expect(sanitized).toContain("$x^2$");
+    expect(sanitized).toContain("https://codeforces.com/images/a.png");
+  });
+
+  it("validates resolve.capture.v1", () => {
+    const value = {
+      schema: "resolve.capture.v1",
+      capture_id: crypto.randomUUID(),
+      captured_at: new Date().toISOString(),
+      platform: "codeforces",
+      problem_key: "1554:B",
+      url: "https://codeforces.com/contest/1554/problem/B",
+      problem: {
+        contest_id: 1554,
+        index: "B",
+        title: "Cobb",
+        rating: 1700,
+        official_tags: ["math"],
+      },
+      statement: {
+        format: "markdown",
+        text: "Let $x$ be an integer.",
+        assets: [],
+      },
+      provenance: {
+        adapter: "codeforces",
+        adapter_version: "1",
+        language: "en",
+      },
+    };
+    expect(CaptureSchema.parse(value).problem.title).toBe("Cobb");
+  });
+});
+
+describe("append-only transcript and schedule contracts", () => {
+  it("keeps message roles and content byte-for-byte", () => {
+    const messages = [
+      {
+        role: "assistant" as const,
+        content: "First question?\nExact spacing.",
+      },
+      { role: "user" as const, content: "  My answer stays padded.  " },
+    ];
+    const parsed = messages.map((message) =>
+      TranscriptMessageSchema.parse(message),
+    );
+    expect(JSON.stringify(parsed)).toBe(JSON.stringify(messages));
+  });
+
+  it("uses the versioned demo ladder", () => {
+    expect(SCHEDULE_VERSION).toBe("initial-v1");
+    expect(INITIAL_INTERVALS).toEqual({
+      recalled: 14,
+      needed_cue: 7,
+      forgot: 2,
+      unresolved: 1,
+    });
+    expect(nextReviewDate("2026-07-30", "recalled")).toBe("2026-08-13");
+  });
+});

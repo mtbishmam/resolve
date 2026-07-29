@@ -1,0 +1,71 @@
+{
+  "schema": "resolve.showcase-selection.v1",
+  "source_database": "https://app.notion.com/p/243d8db956388087825bcff2d6778cae",
+  "selected_count": 8,
+  "selected": [
+    {
+      "platform": "codeforces",
+      "problem_key": "1554:B",
+      "title": "Cobb",
+      "reason": "Strong Retry example with detailed constraint-driven metacognition and a reusable brute-force bound.",
+      "notion_row_url": "https://app.notion.com/2a4f02b8a3264c268248b292b7aac3b2",
+      "source_status": "found"
+    },
+    {
+      "platform": "codeforces",
+      "problem_key": "1486:B",
+      "title": "Eastern Exhibition",
+      "reason": "Detailed Retry geometry row showing an incorrect distance model and a clear median trigger.",
+      "notion_row_url": "https://app.notion.com/31325e4e074344fe9ce199d31f3fd468",
+      "source_status": "found"
+    },
+    {
+      "platform": "codeforces",
+      "problem_key": "1702:E",
+      "title": "Split Into Two Sets",
+      "reason": "Resolve example with a strong recognition trigger connecting two-set division to bipartiteness.",
+      "notion_row_url": "https://app.notion.com/3f42663170344d0ea7ebe9c58afc7d51",
+      "source_status": "found"
+    },
+    {
+      "platform": "codeforces",
+      "problem_key": "1305:C",
+      "title": "Kuroni and Impossible Calculation",
+      "reason": "Resolve number-theory example where pigeonhole reasoning collapses an apparent all-pairs product.",
+      "notion_row_url": "https://app.notion.com/4346a2a85c264acda409b34652c6c8e2",
+      "source_status": "found"
+    },
+    {
+      "platform": "codeforces",
+      "problem_key": "377:A",
+      "title": "Maze",
+      "reason": "Revise grid-search example with a concrete implementation lesson about traversal depth and validity checks.",
+      "notion_row_url": "https://app.notion.com/134cb296d7c74853ac4f7d754058a1d2",
+      "source_status": "found"
+    },
+    {
+      "platform": "codeforces",
+      "problem_key": "2108:A",
+      "title": "Permutation Warm-Up",
+      "reason": "Newer easy Resolve example with a useful permutation invariant and an intentionally missing local source.",
+      "notion_row_url": "https://app.notion.com/289067fc316a4068ab2c7892e43acce1",
+      "source_status": "missing"
+    },
+    {
+      "platform": "cses",
+      "problem_key": "1668",
+      "title": "Building Teams",
+      "reason": "CSES platform example with concise implementation notes distinguishing bipartite checking from cycle detection.",
+      "notion_row_url": "https://app.notion.com/0d3cbbaaa41f46c1884a9ac22aff6455",
+      "source_status": "found"
+    },
+    {
+      "platform": "cses",
+      "problem_key": "1193",
+      "title": "Labyrinth",
+      "reason": "CSES BFS example with a compact path-reconstruction summary and a concrete TLE prevention lesson.",
+      "notion_row_url": "https://app.notion.com/2a6dd19d238e43a7ab9107f4815fcb47",
+      "source_status": "found"
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ReSolve Capture</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <span>R</span>
+      <div>
+        <strong>ReSolve</strong>
+        <em>Codeforces capture</em>
+      </div>
+    </header>
+    <main>
+      <p>
+        Copy this problem’s identity, statement, math, and diagrams into one
+        safe capture.
+      </p>
+      <button id="capture">Capture problem</button>
+      <button id="recover" class="secondary">Copy latest capture</button>
+      <div id="status" role="status" aria-live="polite">
+        Ready on a Codeforces problem page.
+      </div>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

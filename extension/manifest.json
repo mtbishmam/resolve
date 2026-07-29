@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "ReSolve Capture",
+  "version": "0.1.0",
+  "description": "Capture a Codeforces problem for a ReSolve reflection.",
+  "permissions": ["activeTab", "scripting", "storage", "clipboardWrite"],
+  "host_permissions": ["https://codeforces.com/*"],
+  "action": {
+    "default_title": "Capture for ReSolve",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  }
+}
