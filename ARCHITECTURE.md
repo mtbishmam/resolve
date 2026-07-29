@@ -43,7 +43,8 @@ The ReSolve Worker should serve:
 
 - `/` for the web frontend
 - `/api/*` for authenticated frontend operations
-- `/mcp` for authenticated MCP requests
+- `/api/mcp` for authenticated MCP requests (`/mcp` remains a local
+  compatibility alias)
 
 The MCP endpoint and frontend share one D1 binding and one validation/data
 layer. A separate ReSolve database must be used rather than sharing ReSync's

@@ -63,7 +63,8 @@ no completed reviews are fabricated.
 
 ## MCP
 
-The stateless Streamable HTTP endpoint is `/mcp`. Hosted use requires the
+The hosted stateless Streamable HTTP endpoint is `/api/mcp`. `/mcp` remains a
+local compatibility alias. Hosted use requires the
 server-side `RESOLVE_MCP_TOKEN`; local use accepts
 `resolve-local-mcp-token` only on localhost.
 

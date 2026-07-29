@@ -4,10 +4,11 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "..");
 const base = process.env.RESOLVE_BASE_URL ?? "http://localhost:3000";
+const endpoint = process.env.RESOLVE_MCP_PATH ?? "/api/mcp";
 let id = 0;
 
 async function rpc(method, params) {
-  const response = await fetch(`${base}/mcp`, {
+  const response = await fetch(`${base}${endpoint}`, {
     method: "POST",
     headers: {
       authorization: "Bearer resolve-local-mcp-token",
