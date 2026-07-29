@@ -3,6 +3,8 @@
 ReSolve is a private, speed-first competitive-programming reflection and
 active-recall system.
 
+Production: <https://resolve.mtbishmam.chatgpt.site>
+
 - Codex conducts adaptive reflections and writes through authenticated MCP.
 - The web app provides a cache-first problem database, stored statement reader,
   saved views, editing, review history, and a progressive no-AI review flow.
@@ -34,6 +36,7 @@ npm run lint
 npm run typecheck
 npm run test
 npm run test:db
+npm run identity:check
 npm run extension:build
 npm run build
 node scripts/test-mcp-local.mjs # while npm run dev is running

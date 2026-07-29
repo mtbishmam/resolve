@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { headers } from "next/headers";
 import "katex/dist/katex.min.css";
+import identity from "@/identity.json";
 import "./globals.css";
 
 const geist = Geist({ variable: "--font-geist", subsets: ["latin"] });
@@ -25,6 +26,9 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: base,
     title,
     description,
+    alternates: {
+      canonical: identity.productionUrl,
+    },
     openGraph: {
       title,
       description,

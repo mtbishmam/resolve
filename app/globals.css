@@ -1681,15 +1681,53 @@ button.primary,
   }
 
   .review-statement {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    overflow: hidden;
     padding: 30px 18px 40px;
   }
 
   .review-statement h1 {
-    font-size: 34px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    font-size: clamp(28px, 9vw, 34px);
+  }
+
+  .review-layout,
+  .review-surface,
+  .review-overlay {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .review-layout {
+    overflow: hidden;
+  }
+
+  .review-instruction,
+  .review-statement .markdown,
+  .review-statement .markdown p,
+  .review-statement .markdown li {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  .review-statement .katex-display {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
   }
 
   .recall-panel {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     padding: 28px 18px 50px;
+  }
+
+  .source-note {
+    overflow-wrap: anywhere;
   }
 
   .outcomes > div {

@@ -1,0 +1,8 @@
+{
+  "productName": "ReSolve",
+  "workspace": "/Users/mtbishmam/code/resolve",
+  "sitesSlug": "resolve",
+  "productionHostname": "resolve.mtbishmam.chatgpt.site",
+  "productionUrl": "https://resolve.mtbishmam.chatgpt.site",
+  "captureSchema": "resolve.capture.v1"
+}
