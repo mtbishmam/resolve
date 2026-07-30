@@ -11,6 +11,7 @@ import {
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { get as idbGet, set as idbSet } from "idb-keyval";
+import Image from "next/image";
 import {
   lazy,
   Suspense,
@@ -21,7 +22,19 @@ import {
   useState,
 } from "react";
 import type { ProblemDetail, ProblemListItem } from "@/lib/contracts";
+import {
+  DIFFICULTIES,
+  matchesRatingRange,
+  type Difficulty,
+} from "@/lib/difficulty";
 import { INITIAL_INTERVALS, addCalendarDays } from "@/lib/schedule";
+import {
+  PROBLEM_STATES,
+  PROBLEM_STATUSES,
+  reviewTimerMinutes,
+  type ProblemState,
+  type ProblemStatus,
+} from "@/lib/workflow";
 
 const MarkdownContent = lazy(() => import("./markdown"));
 
@@ -45,15 +58,30 @@ type SavedView = {
   name: string;
   filter: {
     due?: "today";
-    status?: string[];
+    state?: ProblemState[];
+    status?: ProblemStatus[];
+    tags?: string[];
+    archived?: boolean;
     search?: string;
     platform?: string;
+    difficulty?: Difficulty;
+    ratingStart?: number;
+    ratingEnd?: number;
   };
   sort: SortingState;
   visibleColumns: string[];
   isDefault: boolean;
+  isCore: boolean;
 };
-type Status = "retry" | "revise" | "resolve";
+type Sprint = {
+  id: string;
+  name: string;
+  month: string;
+  source: string | null;
+  target: Record<string, unknown>;
+  startsOn: string;
+  endsOn: string;
+};
 type Reveal =
   | "none"
   | "memory_cue"
@@ -62,7 +90,7 @@ type Reveal =
   | "source";
 type Outcome = keyof typeof INITIAL_INTERVALS;
 
-const CACHE_KEY = "resolve.problem-index.v1";
+const CACHE_KEY = "resolve.problem-index.v2";
 const REVEALS: Reveal[] = [
   "none",
   "memory_cue",
@@ -74,8 +102,10 @@ const DEFAULT_COLUMNS = [
   "title",
   "platform",
   "rating",
-  "reviewStatus",
-  "nextReviewDate",
+  "difficulty",
+  "state",
+  "status",
+  "dueDate",
 ];
 const columnHelper = createColumnHelper<ProblemListItem>();
 
@@ -114,12 +144,61 @@ function platformLabel(platform: string) {
   return platform === "codeforces" ? "Codeforces" : "CSES";
 }
 
+function DifficultyTag({ difficulty }: { difficulty: Difficulty | null }) {
+  if (!difficulty) return <span className="difficulty-empty">—</span>;
+  return (
+    <span className={`difficulty difficulty-${difficulty}`}>
+      {statusLabel(difficulty)}
+    </span>
+  );
+}
+
 function Secondary({ problem }: { problem: ProblemListItem }) {
   return (
     <span className="secondary">
       {problem.contest}
       {problem.problemIndex ? ` · ${problem.problemIndex}` : ""}
     </span>
+  );
+}
+
+function matchesSavedView(
+  problem: ProblemListItem,
+  filter: SavedView["filter"],
+  today: string,
+) {
+  const query = filter.search?.trim().toLowerCase() ?? "";
+  return (
+    (filter.due !== "today" ||
+      ((problem.dueDate ?? problem.nextReviewDate) !== null &&
+        (problem.dueDate ?? problem.nextReviewDate)! <= today)) &&
+    (filter.archived === undefined ||
+      filter.archived === (problem.archivedAt !== null)) &&
+    (!filter.state?.length ||
+      (problem.state !== null && filter.state.includes(problem.state))) &&
+    (!filter.status?.length ||
+      (problem.status !== null && filter.status.includes(problem.status))) &&
+    (!filter.tags?.length ||
+      filter.tags.every((tag) => problem.officialTags.includes(tag))) &&
+    (!filter.platform ||
+      filter.platform === "all" ||
+      filter.platform === problem.platform) &&
+    (!filter.difficulty || filter.difficulty === problem.difficulty) &&
+    matchesRatingRange(
+      problem,
+      filter.ratingStart ?? null,
+      filter.ratingEnd ?? null,
+    ) &&
+    (!query ||
+      [
+        problem.title,
+        problem.platform,
+        problem.problemKey,
+        problem.contest ?? "",
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(query))
   );
 }
 
@@ -132,16 +211,25 @@ export default function ReSolveApp({
 }) {
   const [problems, setProblems] = useState<ProblemListItem[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
+  const [sprints, setSprints] = useState<Sprint[]>([]);
   const [activeViewId, setActiveViewId] = useState("view-due-today");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProblemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState<Status[]>([]);
+  const [stateFilter, setStateFilter] = useState<ProblemState[]>([]);
+  const [workflowStatusFilter, setWorkflowStatusFilter] = useState<
+    ProblemStatus[]
+  >([]);
+  const [tagFilter, setTagFilter] = useState<string[]>([]);
   const [platformFilter, setPlatformFilter] = useState("all");
-  const [minRating, setMinRating] = useState("");
+  const [difficultyFilter, setDifficultyFilter] = useState<Difficulty | "all">(
+    "all",
+  );
+  const [ratingStart, setRatingStart] = useState("");
+  const [ratingEnd, setRatingEnd] = useState("");
   const [sorting, setSorting] = useState<SortingState>([
-    { id: "nextReviewDate", desc: false },
+    { id: "dueDate", desc: false },
   ]);
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -149,24 +237,32 @@ export default function ReSolveApp({
   const [reviewOpen, setReviewOpen] = useState(false);
   const [syncing, setSyncing] = useState(true);
   const [mobileSection, setMobileSection] = useState("today");
+  const [drawerWidth, setDrawerWidth] = useState(510);
+  const [fullPage, setFullPage] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
   const today = todayDhaka();
 
   const refresh = useCallback(async () => {
     setSyncing(true);
     try {
-      const [problemResponse, viewResponse] = await Promise.all([
-        fetch("/api/problems"),
-        fetch("/api/saved-views"),
-      ]);
-      if (!problemResponse.ok || !viewResponse.ok) {
+      const [problemResponse, viewResponse, sprintResponse] = await Promise.all(
+        [
+          fetch("/api/problems"),
+          fetch("/api/saved-views"),
+          fetch("/api/sprints"),
+        ],
+      );
+      if (!problemResponse.ok || !viewResponse.ok || !sprintResponse.ok) {
         throw new Error("Unable to refresh ReSolve");
       }
       const problemData = (await problemResponse.json()) as {
         problems: ProblemListItem[];
       };
       const viewData = (await viewResponse.json()) as { views: SavedView[] };
+      const sprintData = (await sprintResponse.json()) as { sprints: Sprint[] };
       setProblems(problemData.problems);
       setViews(viewData.views);
+      setSprints(sprintData.sprints);
       await idbSet(CACHE_KEY, problemData.problems);
     } finally {
       setSyncing(false);
@@ -183,6 +279,18 @@ export default function ReSolveApp({
       cancelled = true;
     };
   }, [refresh]);
+
+  useEffect(() => {
+    function focusSearch(event: KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    }
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
 
   const loadDetail = useCallback(async (id: string) => {
     setSelectedId(id);
@@ -203,18 +311,30 @@ export default function ReSolveApp({
     return problems.filter((problem) => {
       const dueMatch =
         activeView?.filter.due !== "today" ||
-        (problem.nextReviewDate !== null && problem.nextReviewDate <= today);
-      const viewStatus = activeView?.filter.status;
-      const viewStatusMatch =
-        !viewStatus?.length || viewStatus.includes(problem.reviewStatus);
-      const statusMatch =
-        !statusFilter.length ||
-        statusFilter.includes(problem.reviewStatus as Status);
+        ((problem.dueDate ?? problem.nextReviewDate) !== null &&
+          (problem.dueDate ?? problem.nextReviewDate)! <= today);
+      const viewMatch = !activeView
+        ? problem.archivedAt === null
+        : matchesSavedView(problem, activeView.filter, today);
+      const stateMatch =
+        !stateFilter.length ||
+        (problem.state !== null && stateFilter.includes(problem.state));
+      const workflowMatch =
+        !workflowStatusFilter.length ||
+        (problem.status !== null &&
+          workflowStatusFilter.includes(problem.status));
+      const tagsMatch =
+        !tagFilter.length ||
+        tagFilter.every((tag) => problem.officialTags.includes(tag));
       const platformMatch =
         platformFilter === "all" || problem.platform === platformFilter;
-      const ratingMatch =
-        !minRating ||
-        (problem.rating !== null && problem.rating >= Number(minRating));
+      const difficultyMatch =
+        difficultyFilter === "all" || problem.difficulty === difficultyFilter;
+      const ratingMatch = matchesRatingRange(
+        problem,
+        ratingStart === "" ? null : Number(ratingStart),
+        ratingEnd === "" ? null : Number(ratingEnd),
+      );
       const textMatch =
         !query ||
         [
@@ -228,28 +348,46 @@ export default function ReSolveApp({
           .includes(query);
       return (
         dueMatch &&
-        viewStatusMatch &&
-        statusMatch &&
+        viewMatch &&
+        stateMatch &&
+        workflowMatch &&
+        tagsMatch &&
         platformMatch &&
+        difficultyMatch &&
         ratingMatch &&
         textMatch
       );
     });
   }, [
     activeView,
-    minRating,
+    difficultyFilter,
     platformFilter,
     problems,
+    ratingEnd,
+    ratingStart,
     search,
-    statusFilter,
+    stateFilter,
+    workflowStatusFilter,
+    tagFilter,
     today,
   ]);
 
   function selectView(view: SavedView) {
     setActiveViewId(view.id);
     setSearch(view.filter.search ?? "");
-    setStatusFilter((view.filter.status ?? []) as Status[]);
+    setStateFilter(view.filter.state ?? []);
+    setWorkflowStatusFilter(view.filter.status ?? []);
+    setTagFilter(view.filter.tags ?? []);
     setPlatformFilter(view.filter.platform ?? "all");
+    setDifficultyFilter(view.filter.difficulty ?? "all");
+    setRatingStart(
+      view.filter.ratingStart === undefined
+        ? ""
+        : String(view.filter.ratingStart),
+    );
+    setRatingEnd(
+      view.filter.ratingEnd === undefined ? "" : String(view.filter.ratingEnd),
+    );
     if (view.sort.length) setSorting(view.sort);
     setVisibility(
       Object.fromEntries(
@@ -276,8 +414,13 @@ export default function ReSolveApp({
         filter: {
           schema: "resolve.filter.v1",
           search,
-          status: statusFilter,
+          state: stateFilter,
+          status: workflowStatusFilter,
+          tags: tagFilter,
           platform: platformFilter,
+          difficulty: difficultyFilter === "all" ? undefined : difficultyFilter,
+          ratingStart: ratingStart === "" ? undefined : Number(ratingStart),
+          ratingEnd: ratingEnd === "" ? undefined : Number(ratingEnd),
         },
         sort: sorting,
         visibleColumns,
@@ -317,17 +460,42 @@ export default function ReSolveApp({
           <span className="rating">{getValue() ?? "—"}</span>
         ),
       }),
-      columnHelper.accessor("reviewStatus", {
+      columnHelper.accessor("difficulty", {
+        header: "Difficulty",
+        size: 102,
+        sortingFn: (rowA, rowB) => {
+          const order: Record<Difficulty, number> = {
+            easy: 0,
+            medium: 1,
+            hard: 2,
+            extreme: 3,
+          };
+          const first = rowA.original.difficulty;
+          const second = rowB.original.difficulty;
+          return (first ? order[first] : 4) - (second ? order[second] : 4);
+        },
+        cell: ({ getValue }) => <DifficultyTag difficulty={getValue()} />,
+      }),
+      columnHelper.accessor("state", {
         header: "State",
         size: 116,
         cell: ({ getValue }) => (
           <span className={`status status-${getValue()}`}>
-            {statusLabel(getValue())}
+            {getValue() ? statusLabel(getValue()!) : "—"}
           </span>
         ),
       }),
-      columnHelper.accessor("nextReviewDate", {
-        header: "Next review",
+      columnHelper.accessor("status", {
+        header: "Status",
+        size: 118,
+        cell: ({ getValue }) => (
+          <span className={`status workflow-${getValue() ?? "unclassified"}`}>
+            {getValue() ? statusLabel(getValue()!.replace("_", " ")) : "—"}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("dueDate", {
+        header: "Due date",
         size: 132,
         sortingFn: "datetime",
         cell: ({ getValue }) => {
@@ -363,13 +531,19 @@ export default function ReSolveApp({
   const closeDetail = () => {
     setSelectedId(null);
     setDetail(null);
+    setFullPage(false);
   };
 
   async function updateDetail(
     patch: Partial<{
       rating: number | null;
-      reviewStatus: Status;
+      difficulty: Difficulty | null;
+      state: ProblemState | null;
+      status: ProblemStatus | null;
+      archived: boolean;
+      dueDate: string | null;
       nextReviewDate: string | null;
+      officialTags: string[];
     }>,
   ) {
     if (!detail) return;
@@ -388,44 +562,106 @@ export default function ReSolveApp({
     <main className="app-shell">
       <aside className="sidebar">
         <div className="brand-row">
-          <span className="brand-mark">R</span>
+          <Image
+            className="brand-mark"
+            src="/resolve-logo.png"
+            alt=""
+            width={34}
+            height={34}
+            priority
+          />
           <div>
             <strong>ReSolve</strong>
             <span>Recall what matters</span>
           </div>
         </div>
-        <div className="sidebar-heading">Saved views</div>
-        <nav className="view-nav" aria-label="Saved views">
-          {views.map((view) => {
-            const count = problems.filter((problem) => {
-              if (view.filter.due === "today") {
-                return (
-                  problem.nextReviewDate !== null &&
-                  problem.nextReviewDate <= today
-                );
-              }
+        <div className="sidebar-heading">Core views</div>
+        <nav className="view-nav" aria-label="Core views">
+          {views
+            .filter((view) => view.isCore)
+            .map((view) => {
+              const count = problems.filter((problem) =>
+                matchesSavedView(problem, view.filter, today),
+              ).length;
               return (
-                !view.filter.status?.length ||
-                view.filter.status.includes(problem.reviewStatus)
+                <button
+                  key={view.id}
+                  className={activeViewId === view.id ? "active" : ""}
+                  onClick={() => selectView(view)}
+                >
+                  <span
+                    className={`view-dot ${view.id.replace("view-", "")}`}
+                  />
+                  <span>{view.name}</span>
+                  <em>{count}</em>
+                </button>
               );
-            }).length;
-            return (
-              <button
-                key={view.id}
-                className={activeViewId === view.id ? "active" : ""}
-                onClick={() => selectView(view)}
-              >
-                <span className={`view-dot ${view.id.replace("view-", "")}`} />
-                <span>{view.name}</span>
-                <em>{count}</em>
-              </button>
-            );
-          })}
+            })}
+        </nav>
+        <div className="sidebar-heading saved-heading">Saved views</div>
+        <nav className="view-nav" aria-label="Saved views">
+          {views
+            .filter((view) => !view.isCore)
+            .map((view) => {
+              const count = problems.filter((problem) =>
+                matchesSavedView(problem, view.filter, today),
+              ).length;
+              return (
+                <div className="saved-view-row" key={view.id}>
+                  <button
+                    className={activeViewId === view.id ? "active" : ""}
+                    onClick={() => selectView(view)}
+                  >
+                    <span className="view-dot custom" />
+                    <span>{view.name}</span>
+                    <em>{count}</em>
+                  </button>
+                  <button
+                    className="delete-view"
+                    aria-label={`Delete ${view.name}`}
+                    onClick={async () => {
+                      const response = await fetch(
+                        `/api/saved-views?id=${encodeURIComponent(view.id)}`,
+                        { method: "DELETE" },
+                      );
+                      if (response.ok) {
+                        setActiveViewId("view-due-today");
+                        await refresh();
+                      }
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
         </nav>
         <button className="new-view" onClick={() => void saveCurrentView()}>
           <span>＋</span> Save current view
         </button>
         <div className="sidebar-spacer" />
+        {sprints[0] ? (
+          <div className="sprint-card">
+            <span>Current sprint</span>
+            <strong>{sprints[0].name}</strong>
+            <em>{sprints[0].source ?? "To be decided"}</em>
+            <p>
+              {
+                problems.filter(
+                  (problem) =>
+                    problem.sprintId === sprints[0].id &&
+                    problem.status === "accepted",
+                ).length
+              }
+              /
+              {
+                problems.filter((problem) => problem.sprintId === sprints[0].id)
+                  .length
+              }{" "}
+              accepted
+            </p>
+          </div>
+        ) : null}
         <div className="storage-card">
           <span className="pulse" />
           <div>
@@ -442,7 +678,12 @@ export default function ReSolveApp({
         </div>
       </aside>
 
-      <section className={`workspace ${selectedId ? "drawer-open" : ""}`}>
+      <section
+        className={`workspace ${selectedId ? "drawer-open" : ""} ${
+          drawerWidth > 700 || fullPage ? "drawer-overlay" : ""
+        }`}
+        style={{ "--drawer-width": `${drawerWidth}px` } as React.CSSProperties}
+      >
         <header className="topbar">
           <div>
             <div className="eyebrow">Problem library</div>
@@ -463,6 +704,7 @@ export default function ReSolveApp({
           <label className="search">
             <span>⌕</span>
             <input
+              ref={searchRef}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
               placeholder="Search name, contest, or key…"
@@ -475,11 +717,20 @@ export default function ReSolveApp({
               onClick={() => setFiltersOpen((value) => !value)}
             >
               Filters
-              {statusFilter.length || platformFilter !== "all" || minRating ? (
+              {stateFilter.length ||
+              workflowStatusFilter.length ||
+              tagFilter.length ||
+              platformFilter !== "all" ||
+              difficultyFilter !== "all" ||
+              ratingStart ||
+              ratingEnd ? (
                 <b>
-                  {statusFilter.length +
+                  {stateFilter.length +
+                    workflowStatusFilter.length +
+                    Number(tagFilter.length > 0) +
                     Number(platformFilter !== "all") +
-                    Number(Boolean(minRating))}
+                    Number(difficultyFilter !== "all") +
+                    Number(Boolean(ratingStart || ratingEnd))}
                 </b>
               ) : null}
             </button>
@@ -488,8 +739,8 @@ export default function ReSolveApp({
               onClick={() =>
                 setSorting((current) =>
                   current[0]?.desc
-                    ? [{ id: "nextReviewDate", desc: false }]
-                    : [{ id: "nextReviewDate", desc: true }],
+                    ? [{ id: "dueDate", desc: false }]
+                    : [{ id: "dueDate", desc: true }],
                 )
               }
             >
@@ -529,12 +780,12 @@ export default function ReSolveApp({
           <div className="filter-row">
             <div>
               <span>State</span>
-              {(["retry", "revise", "resolve"] as Status[]).map((status) => (
+              {PROBLEM_STATES.map((status) => (
                 <button
                   key={status}
-                  className={statusFilter.includes(status) ? "selected" : ""}
+                  className={stateFilter.includes(status) ? "selected" : ""}
                   onClick={() =>
-                    setStatusFilter((current) =>
+                    setStateFilter((current) =>
                       current.includes(status)
                         ? current.filter((value) => value !== status)
                         : [...current, status],
@@ -545,6 +796,50 @@ export default function ReSolveApp({
                 </button>
               ))}
             </div>
+            <label>
+              Status
+              <select
+                value={workflowStatusFilter[0] ?? "all"}
+                onChange={(event) =>
+                  setWorkflowStatusFilter(
+                    event.target.value === "all"
+                      ? []
+                      : [event.target.value as ProblemStatus],
+                  )
+                }
+              >
+                <option value="all">All</option>
+                {PROBLEM_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {statusLabel(status.replace("_", " "))}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Tags
+              <select
+                value={tagFilter[0] ?? "all"}
+                onChange={(event) =>
+                  setTagFilter(
+                    event.target.value === "all" ? [] : [event.target.value],
+                  )
+                }
+              >
+                <option value="all">All</option>
+                {[
+                  ...new Set(
+                    problems.flatMap((problem) => problem.officialTags),
+                  ),
+                ]
+                  .sort()
+                  .map((tag) => (
+                    <option key={tag} value={tag}>
+                      {tag}
+                    </option>
+                  ))}
+              </select>
+            </label>
             <label>
               Platform
               <select
@@ -557,20 +852,49 @@ export default function ReSolveApp({
               </select>
             </label>
             <label>
-              Minimum rating
+              Difficulty
+              <select
+                value={difficultyFilter}
+                onChange={(event) =>
+                  setDifficultyFilter(event.target.value as Difficulty | "all")
+                }
+              >
+                <option value="all">All</option>
+                {DIFFICULTIES.map((difficulty) => (
+                  <option key={difficulty} value={difficulty}>
+                    {statusLabel(difficulty)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Start rating
               <input
                 type="number"
-                value={minRating}
-                onChange={(event) => setMinRating(event.target.value)}
+                value={ratingStart}
+                onChange={(event) => setRatingStart(event.target.value)}
+                placeholder="Any"
+              />
+            </label>
+            <label>
+              End rating
+              <input
+                type="number"
+                value={ratingEnd}
+                onChange={(event) => setRatingEnd(event.target.value)}
                 placeholder="Any"
               />
             </label>
             <button
               className="clear-filters"
               onClick={() => {
-                setStatusFilter([]);
+                setStateFilter([]);
+                setWorkflowStatusFilter([]);
+                setTagFilter([]);
                 setPlatformFilter("all");
-                setMinRating("");
+                setDifficultyFilter("all");
+                setRatingStart("");
+                setRatingEnd("");
               }}
             >
               Clear
@@ -608,8 +932,15 @@ export default function ReSolveApp({
           detail={detail}
           loading={detailLoading}
           onClose={closeDetail}
-          onReview={() => setReviewOpen(true)}
+          onReview={() => {
+            void updateDetail({ status: "attempting" });
+            setReviewOpen(true);
+          }}
           onUpdate={updateDetail}
+          width={drawerWidth}
+          onWidth={setDrawerWidth}
+          fullPage={fullPage}
+          onFullPage={setFullPage}
         />
       ) : null}
 
@@ -747,17 +1078,25 @@ function ProblemCards({
             <span className={`platform platform-${problem.platform}`}>
               {platformLabel(problem.platform)}
             </span>
-            <span className={`status status-${problem.reviewStatus}`}>
-              {statusLabel(problem.reviewStatus)}
+            <span className={`status status-${problem.state ?? "none"}`}>
+              {problem.state ? statusLabel(problem.state) : "No state"}
+            </span>
+            <span className={`status workflow-${problem.status ?? "none"}`}>
+              {problem.status
+                ? statusLabel(problem.status.replace("_", " "))
+                : "No status"}
             </span>
           </div>
           <h2>{problem.title}</h2>
           <Secondary problem={problem} />
           <div className="card-bottom">
-            <span>{problem.rating ?? "Native difficulty"}</span>
-            <strong>{dateLabel(problem.nextReviewDate)}</strong>
-            {problem.nextReviewDate &&
-            problem.nextReviewDate <= todayDhaka() ? (
+            <span>{problem.rating ?? "Unrated"}</span>
+            <DifficultyTag difficulty={problem.difficulty} />
+            <strong>
+              {dateLabel(problem.dueDate ?? problem.nextReviewDate)}
+            </strong>
+            {(problem.dueDate ?? problem.nextReviewDate) &&
+            (problem.dueDate ?? problem.nextReviewDate)! <= todayDhaka() ? (
               <button
                 onClick={(event) => {
                   event.stopPropagation();
@@ -780,6 +1119,10 @@ function DetailDrawer({
   onClose,
   onReview,
   onUpdate,
+  width,
+  onWidth,
+  fullPage,
+  onFullPage,
 }: {
   detail: ProblemDetail | null;
   loading: boolean;
@@ -788,12 +1131,41 @@ function DetailDrawer({
   onUpdate: (
     patch: Partial<{
       rating: number | null;
-      reviewStatus: Status;
+      difficulty: Difficulty | null;
+      state: ProblemState | null;
+      status: ProblemStatus | null;
+      archived: boolean;
+      dueDate: string | null;
       nextReviewDate: string | null;
+      officialTags: string[];
     }>,
   ) => Promise<void>;
+  width: number;
+  onWidth: (width: number) => void;
+  fullPage: boolean;
+  onFullPage: (value: boolean) => void;
 }) {
   const [tab, setTab] = useState("overview");
+  const [showTags, setShowTags] = useState(false);
+  function startResize(event: React.PointerEvent) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const startWidth = width;
+    function move(moveEvent: PointerEvent) {
+      onWidth(
+        Math.min(
+          window.innerWidth - 32,
+          Math.max(380, startWidth + startX - moveEvent.clientX),
+        ),
+      );
+    }
+    function stop() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+    }
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+  }
   if (loading && !detail) {
     return (
       <aside className="detail-drawer">
@@ -808,7 +1180,17 @@ function DetailDrawer({
   if (!detail) return null;
   const reflection = detail.reflection;
   return (
-    <aside className="detail-drawer">
+    <aside
+      className={`detail-drawer ${fullPage ? "full-page" : ""}`}
+      style={{ width: fullPage ? "100vw" : width }}
+    >
+      {!fullPage ? (
+        <button
+          className="drawer-resizer"
+          aria-label="Resize problem panel"
+          onPointerDown={startResize}
+        />
+      ) : null}
       <div className="drawer-top">
         <button className="drawer-close" onClick={onClose} aria-label="Close">
           ×
@@ -817,6 +1199,9 @@ function DetailDrawer({
           <a href={detail.url} target="_blank" rel="noreferrer">
             Open judge ↗
           </a>
+          <button onClick={() => onFullPage(!fullPage)}>
+            {fullPage ? "Exit full page" : "Full page"}
+          </button>
           <button className="primary" onClick={onReview}>
             Start review
           </button>
@@ -827,9 +1212,15 @@ function DetailDrawer({
           <span className={`platform platform-${detail.platform}`}>
             {platformLabel(detail.platform)}
           </span>
-          <span className={`status status-${detail.reviewStatus}`}>
-            {statusLabel(detail.reviewStatus)}
+          <span className={`status status-${detail.state ?? "none"}`}>
+            {detail.state ? statusLabel(detail.state) : "No state"}
           </span>
+          <span className={`status workflow-${detail.status ?? "none"}`}>
+            {detail.status
+              ? statusLabel(detail.status.replace("_", " "))
+              : "No status"}
+          </span>
+          <DifficultyTag difficulty={detail.difficulty} />
         </div>
         <h2>{detail.title}</h2>
         <p>
@@ -852,19 +1243,12 @@ function DetailDrawer({
       <div className="drawer-content">
         {tab === "overview" ? (
           <>
-            <section className="recall-card">
-              <span>Memory cue</span>
-              <p>{reflection?.memoryCue ?? "Not captured"}</p>
-            </section>
-            <section className="insight-card">
-              <span>Key insight</span>
-              <p>
-                {reflection?.structuredSummary.key_insight ?? "Not captured"}
-              </p>
-              {reflection?.structuredSummary.provenance.key_insight ===
-              "codex_inferred_demo" ? (
-                <em>AI-inferred showcase field · needs confirmation</em>
-              ) : null}
+            <section className="insight-card summary-card">
+              <span>Summary</span>
+              <Markdown>
+                {reflection?.summaryMarkdown ??
+                  "No plain-language problem summary has been generated yet."}
+              </Markdown>
             </section>
             <div className="property-grid">
               <Property
@@ -892,28 +1276,91 @@ function DetailDrawer({
                 />
               </label>
               <label className="editable-property">
-                <span>Review state</span>
+                <span>Difficulty</span>
                 <select
-                  value={detail.reviewStatus}
+                  value={detail.difficulty ?? ""}
+                  disabled={detail.rating !== null}
+                  title={
+                    detail.rating === null
+                      ? "Adaptive CSES difficulty"
+                      : "Derived from the Codeforces rating"
+                  }
                   onChange={(event) =>
                     void onUpdate({
-                      reviewStatus: event.target.value as Status,
+                      difficulty: event.target.value as Difficulty,
                     })
                   }
                 >
+                  <option value="" disabled>
+                    Unclassified
+                  </option>
+                  {DIFFICULTIES.map((difficulty) => (
+                    <option key={difficulty} value={difficulty}>
+                      {statusLabel(difficulty)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="editable-property">
+                <span>REVIEW STATE</span>
+                <select
+                  value={detail.state ?? ""}
+                  onChange={(event) =>
+                    void onUpdate({
+                      state: event.target.value
+                        ? (event.target.value as ProblemState)
+                        : null,
+                    })
+                  }
+                >
+                  <option value="">None</option>
                   <option value="retry">Retry</option>
                   <option value="revise">Revise</option>
                   <option value="resolve">Resolve</option>
                 </select>
               </label>
-              <label className="editable-property wide">
-                <span>Next review</span>
-                <input
-                  type="date"
-                  value={detail.nextReviewDate ?? ""}
+              <label className="editable-property">
+                <span>Status</span>
+                <select
+                  value={detail.status ?? ""}
                   onChange={(event) =>
                     void onUpdate({
-                      nextReviewDate: event.target.value || null,
+                      status: event.target.value
+                        ? (event.target.value as ProblemStatus)
+                        : null,
+                    })
+                  }
+                >
+                  <option value="">Unclassified</option>
+                  {PROBLEM_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {statusLabel(status.replace("_", " "))}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="editable-property wide">
+                <span>Review Date</span>
+                <input
+                  type="date"
+                  value={detail.dueDate ?? ""}
+                  onChange={(event) =>
+                    void onUpdate({
+                      dueDate: event.target.value || null,
+                    })
+                  }
+                />
+              </label>
+              <label className="editable-property wide">
+                <span>Tags</span>
+                <input
+                  value={detail.officialTags.join(", ")}
+                  onChange={(event) =>
+                    void onUpdate({
+                      officialTags: event.target.value
+                        .split(",")
+                        .map((tag) => tag.trim())
+                        .filter(Boolean),
                     })
                   }
                 />
@@ -927,11 +1374,24 @@ function DetailDrawer({
                 }
                 wide
               />
-              <Property
-                label="Official tags"
-                value={detail.officialTags.join(", ") || "Not captured"}
-                wide
-              />
+              <div className="property wide hidden-tags">
+                <span>Official tags</span>
+                <button onClick={() => setShowTags((value) => !value)}>
+                  {showTags
+                    ? detail.officialTags.join(", ") || "Not captured"
+                    : "Show tags"}
+                </button>
+              </div>
+              <label className="archive-toggle wide">
+                <input
+                  type="checkbox"
+                  checked={detail.archivedAt !== null}
+                  onChange={(event) =>
+                    void onUpdate({ archived: event.target.checked })
+                  }
+                />
+                Archived (Status and State are preserved)
+              </label>
             </div>
           </>
         ) : null}
@@ -953,7 +1413,7 @@ function DetailDrawer({
           </section>
         ) : null}
         {tab === "reflection" ? (
-          <ReflectionView reflection={reflection} />
+          <ReflectionEditor reflection={reflection} />
         ) : null}
         {tab === "history" ? (
           <section>
@@ -1058,6 +1518,8 @@ function ReflectionView({
       <Field title="Summary">
         <Markdown>{reflection.summaryMarkdown}</Markdown>
       </Field>
+      <Field title="Memory cue" value={reflection.memoryCue} accent />
+      <Field title="Key insight" value={summary.key_insight} accent />
       <Field title="Wrong mental model" value={summary.wrong_mental_model} />
       <Field
         title="Why it seemed reasonable"
@@ -1086,6 +1548,157 @@ function ReflectionView({
   );
 }
 
+function ReflectionEditor({
+  reflection,
+}: {
+  reflection: ProblemDetail["reflection"];
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(reflection);
+  const [saving, setSaving] = useState(false);
+  if (!reflection || !draft) {
+    return (
+      <EmptyState
+        title="No reflection yet"
+        body="The statement remains reviewable; Codex can create the first reflection."
+      />
+    );
+  }
+  if (!editing) {
+    return (
+      <>
+        <button className="edit-reflection" onClick={() => setEditing(true)}>
+          Edit reflection
+        </button>
+        <ReflectionView reflection={draft} />
+      </>
+    );
+  }
+  const currentDraft = draft;
+  const structured = draft.structuredSummary;
+  const textFields = [
+    ["key_insight", "Key insight"],
+    ["wrong_mental_model", "Wrong mental model"],
+    ["why_it_seemed_reasonable", "Why it seemed reasonable"],
+    ["breakthrough_observation", "Breakthrough"],
+    ["correct_trigger", "Correct trigger"],
+    ["general_pattern", "General pattern"],
+  ] as const;
+  async function save() {
+    setSaving(true);
+    try {
+      const response = await fetch(`/api/reflections/${currentDraft.id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          summaryMarkdown: currentDraft.summaryMarkdown,
+          memoryCue: currentDraft.memoryCue,
+          confidence: currentDraft.confidence,
+          structuredSummary: structured,
+        }),
+      });
+      if (!response.ok) throw new Error("Reflection save failed");
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <section className="reflection-editor">
+      <label>
+        Summary
+        <textarea
+          value={draft.summaryMarkdown}
+          onChange={(event) =>
+            setDraft({ ...draft, summaryMarkdown: event.target.value })
+          }
+        />
+      </label>
+      <label>
+        Memory cue
+        <textarea
+          value={draft.memoryCue}
+          onChange={(event) =>
+            setDraft({ ...draft, memoryCue: event.target.value })
+          }
+        />
+      </label>
+      {textFields.map(([key, label]) => (
+        <label key={key}>
+          {label}
+          <textarea
+            value={structured[key]}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                structuredSummary: {
+                  ...structured,
+                  [key]: event.target.value,
+                },
+              })
+            }
+          />
+        </label>
+      ))}
+      {(
+        [
+          ["missing_concepts", "Missing concepts"],
+          ["cognitive_mistakes", "Cognitive mistakes"],
+        ] as const
+      ).map(([key, label]) => (
+        <label key={key}>
+          {label} (one per line)
+          <textarea
+            value={structured[key].join("\n")}
+            onChange={(event) =>
+              setDraft({
+                ...draft,
+                structuredSummary: {
+                  ...structured,
+                  [key]: event.target.value
+                    .split("\n")
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                },
+              })
+            }
+          />
+        </label>
+      ))}
+      <label>
+        Confidence
+        <input
+          type="number"
+          min="0"
+          max="5"
+          value={draft.confidence ?? ""}
+          onChange={(event) =>
+            setDraft({
+              ...draft,
+              confidence: event.target.value
+                ? Number(event.target.value)
+                : null,
+            })
+          }
+        />
+      </label>
+      <p className="immutable-note">
+        The raw interview transcript stays immutable as provenance.
+      </p>
+      <div className="editor-actions">
+        <button onClick={() => setEditing(false)}>Cancel</button>
+        <button
+          className="primary"
+          disabled={saving}
+          onClick={() => void save()}
+        >
+          {saving ? "Saving…" : "Save reflection"}
+        </button>
+      </div>
+    </section>
+  );
+}
+
 function ReviewSurface({
   problem,
   onClose,
@@ -1100,9 +1713,20 @@ function ReviewSurface({
   const [outcome, setOutcome] = useState<Outcome | null>(null);
   const [nextDate, setNextDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const reflection = problem.reflection;
   const deepestIndex = REVEALS.indexOf(deepest);
   const canRevealSource = Boolean(reflection?.sourceSnapshot);
+  const timerLimitSeconds =
+    reviewTimerMinutes(problem.state, problem.difficulty) * 60;
+  useEffect(() => {
+    const started = Date.now();
+    const timer = window.setInterval(
+      () => setElapsedSeconds(Math.floor((Date.now() - started) / 1000)),
+      1000,
+    );
+    return () => window.clearInterval(timer);
+  }, []);
 
   function revealNext() {
     const max = canRevealSource ? 4 : 3;
@@ -1126,11 +1750,13 @@ function ReviewSurface({
           idempotency_key: `web:${problem.id}:${crypto.randomUUID()}`,
           problem_id: problem.id,
           reflection_id: reflection.id,
-          due_date: problem.nextReviewDate ?? todayDhaka(),
+          due_date: problem.dueDate ?? problem.nextReviewDate ?? todayDhaka(),
           outcome,
           deepest_reveal: deepest,
           recall_note: recallNote,
           next_review_date: nextDate,
+          timer_limit_seconds: timerLimitSeconds,
+          timer_elapsed_seconds: elapsedSeconds,
         }),
       });
       if (!response.ok) throw new Error("Review save failed");
@@ -1146,7 +1772,14 @@ function ReviewSurface({
         <header>
           <button onClick={onClose}>← Exit review</button>
           <div className="review-progress">
-            <span>Active recall</span>
+            <span>
+              {problem.state ? statusLabel(problem.state) : "Resolve"} ·{" "}
+              {Math.max(
+                0,
+                Math.ceil((timerLimitSeconds - elapsedSeconds) / 60),
+              )}
+              m left
+            </span>
             <i style={{ width: `${20 + deepestIndex * 16}%` }} />
           </div>
           <span className="review-key">{problem.problemKey}</span>
@@ -1157,7 +1790,8 @@ function ReviewSurface({
               <span className={`platform platform-${problem.platform}`}>
                 {platformLabel(problem.platform)}
               </span>
-              <span>{problem.rating ?? "Native difficulty"}</span>
+              <span>{problem.rating ?? "Unrated"}</span>
+              <DifficultyTag difficulty={problem.difficulty} />
             </div>
             <h1>{problem.title}</h1>
             <p className="review-instruction">

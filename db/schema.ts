@@ -17,6 +17,7 @@ export const problems = sqliteTable(
     contest: text("contest"),
     problemIndex: text("problem_index"),
     rating: integer("rating"),
+    difficulty: text("difficulty"),
     officialTagsJson: text("official_tags_json").notNull().default("[]"),
     statementMarkdown: text("statement_markdown").notNull().default(""),
     statementAssetsJson: text("statement_assets_json").notNull().default("[]"),
@@ -32,6 +33,11 @@ export const problems = sqliteTable(
       .notNull()
       .default("{}"),
     reviewStatus: text("review_status").notNull().default("resolve"),
+    state: text("state"),
+    status: text("status"),
+    archivedAt: text("archived_at"),
+    dueDate: text("due_date"),
+    sprintId: text("sprint_id"),
     nextReviewDate: text("next_review_date"),
     createdAt: text("created_at").notNull(),
     updatedAt: text("updated_at").notNull(),
@@ -43,7 +49,12 @@ export const problems = sqliteTable(
     ),
     index("problems_due_idx").on(table.nextReviewDate),
     index("problems_status_idx").on(table.reviewStatus),
+    index("problems_workflow_state_idx").on(table.state),
+    index("problems_workflow_status_idx").on(table.status),
+    index("problems_archived_idx").on(table.archivedAt),
+    index("problems_sprint_due_idx").on(table.sprintId, table.dueDate),
     index("problems_rating_idx").on(table.rating),
+    index("problems_difficulty_idx").on(table.difficulty),
     index("problems_updated_idx").on(table.updatedAt),
   ],
 );
@@ -97,6 +108,8 @@ export const reviews = sqliteTable(
     previousIntervalDays: integer("previous_interval_days"),
     nextReviewDate: text("next_review_date"),
     scheduleVersion: text("schedule_version").notNull(),
+    timerLimitSeconds: integer("timer_limit_seconds"),
+    timerElapsedSeconds: integer("timer_elapsed_seconds"),
     createdAt: text("created_at").notNull(),
   },
   (table) => [
@@ -118,3 +131,19 @@ export const savedViews = sqliteTable("saved_views", {
   createdAt: text("created_at").notNull(),
   updatedAt: text("updated_at").notNull(),
 });
+
+export const sprints = sqliteTable(
+  "sprints",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    month: text("month").notNull(),
+    source: text("source"),
+    targetJson: text("target_json").notNull().default("{}"),
+    startsOn: text("starts_on").notNull(),
+    endsOn: text("ends_on").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [uniqueIndex("sprints_month_unique").on(table.month)],
+);

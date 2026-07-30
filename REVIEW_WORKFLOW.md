@@ -1,5 +1,17 @@
 # Review workflow
 
+## State definitions and timers
+
+- **Revise (Insta Solve):** expected to be solvable again, with a speed goal.
+  Easy 10m, Medium 20m, Hard 30m, Extreme 30m. Unaided success archives it;
+  failure reschedules it.
+- **Retry:** previously unsolved. Easy 10m, Medium 30m, Hard 60m, Extreme 90m.
+- **Resolve:** uncertain reconstruction. It uses the Retry timer matrix.
+
+State is nullable and independent from Status. Starting a review marks the
+problem Attempting. Finishing records timer limit/elapsed seconds and never
+silently rewrites State or Status.
+
 ## Purpose
 
 A review should strengthen recognition and reconstruction. Passive rereading is
@@ -13,7 +25,8 @@ for the selected due problem.
 Initially visible:
 
 - Official problem name
-- Platform and rating as secondary context
+- Platform, rating, and difficulty as secondary context
+- Status and State as secondary workflow context
 - Stored problem statement
 - Input, output, examples, TeX, and linked diagrams
 - A blank optional recall note
@@ -58,6 +71,10 @@ The user selects one outcome:
 ReSolve appends a review event, calculates the next review date using the active
 schedule version, and shows the new date. The user may override the date before
 confirming.
+
+A review outcome never changes Status because Status records solve and judge
+progress. Any State change after review is explicit rather than inferred from
+the outcome.
 
 The initial `initial-v1` interval ladder is Recalled 14 days, Needed cue 7 days,
 Forgot 2 days, and Unresolved 1 day. It is stored as versioned configuration;

@@ -1,6 +1,17 @@
 # Data model
 
-The MVP uses four tables. JSON is used for evolving structures, but stable
+`problems.state` is nullable `retry | revise | resolve`.
+`problems.status` is nullable for untouched legacy rows and otherwise
+`backlog | attempting | pending_ac | accepted`. `archived_at` does not alter
+either. `due_date` is the sprint deadline; `next_review_date` remains the
+spaced-review projection.
+
+The durable `sprints` table stores monthly milestone identity, date range,
+source, and target. Reviews persist `timer_limit_seconds` and
+`timer_elapsed_seconds`. Saved-view `resolve.filter.v2` separates `state`,
+`status`, `tags`, `archived`, and `due`.
+
+The app uses five tables. JSON is used for evolving structures, but stable
 filter and scheduling fields remain ordinary columns.
 
 ## `problems`
@@ -17,6 +28,7 @@ Core fields:
 - `contest`
 - `problem_index`
 - `rating`
+- `difficulty`
 - `official_tags_json`
 - `statement_markdown`
 - `statement_assets_json`
@@ -27,13 +39,15 @@ Core fields:
 - `import_source`
 - `metadata_provenance_json`
 - `import_provenance_json`
-- `review_status`
+- `status`
+- `state`
+- `archived_at`
 - `next_review_date`
 - `created_at`
 - `updated_at`
 
-`review_status` and `next_review_date` are fast list projections. Completed
-review history remains append-only in `reviews`.
+`status`, `state`, `archived_at`, and `next_review_date` are fast list
+projections. Completed review history remains append-only in `reviews`.
 
 Constraints:
 
@@ -41,6 +55,26 @@ Constraints:
 - `title` is only the official problem name
 - URLs and filenames are not identities
 - Statement assets contain absolute external URLs initially
+- `difficulty` is nullable for genuinely unclassified legacy rows and otherwise
+  one of `easy`, `medium`, `hard`, or `extreme`
+- A numeric rating deterministically owns its difficulty band; unrated problems
+  receive adaptive difficulty during reflection
+- Migrations preserve valid imported difficulty and do not invent values for
+  unclassified rows; the initial difficulty migration backfills only the eight
+  approved showcase records
+- `status` is one of `backlog`, `attempting`, `pending_ac`, or `accepted`
+- `state` is nullable and otherwise one of `retry`, `revise`, or `resolve`
+- Valid combinations are:
+  - `backlog` with no State
+  - `attempting` with `retry` or no State
+  - `pending_ac` with `revise`, `resolve`, or no State
+  - `accepted` with `revise`, `resolve`, or no State
+- `archived_at` is nullable and does not replace or clear Status or State
+- Existing `review_status` values migrate losslessly to `state`
+- Existing rows without reliable judge evidence retain an unclassified nullable
+  Status until the user classifies them; migrations must not invent an accepted
+  verdict
+- New and updated problems must use a classified Status
 
 ## `reflections`
 
@@ -127,6 +161,10 @@ Core fields:
 
 Filters and sorts use a versioned expression format so future fields can be
 introduced without rewriting existing views.
+
+The built-in **Pending AC** view filters for `status = pending_ac` and
+`archived_at IS NULL`. Archived problems remain reachable through an archived
+view.
 
 ## Dates
 

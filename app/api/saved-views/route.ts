@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { authorizeBrowserRequest } from "@/lib/auth";
-import { listSavedViews, saveCustomView } from "@/db/queries";
+import { deleteCustomView, listSavedViews, saveCustomView } from "@/db/queries";
 
 const ViewSchema = z.object({
   name: z.string().min(1).max(80),
@@ -25,4 +25,19 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid saved view" }, { status: 400 });
   }
   return Response.json(await saveCustomView(parsed.data), { status: 201 });
+}
+
+export async function DELETE(request: Request) {
+  if (!(await authorizeBrowserRequest(request))) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
+  if (!(await deleteCustomView(id))) {
+    return Response.json(
+      { error: "Core views cannot be deleted" },
+      { status: 409 },
+    );
+  }
+  return new Response(null, { status: 204 });
 }

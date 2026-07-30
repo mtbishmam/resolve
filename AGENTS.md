@@ -51,11 +51,15 @@ interviewed about a solved problem.
    reusable trigger, and what the user would notice next time.
 10. Preserve ordered interview messages with exact roles and wording.
 11. Generate a compact summary and memory cue.
-12. Propose tomorrow as the default first review date in `Asia/Dhaka`, while
+12. Derive Codeforces difficulty from rating. For an unrated CSES problem,
+    assign one adaptive difficulty (`easy`, `medium`, `hard`, or `extreme`)
+    based on the user's reasoning; do not reveal an external difficulty before
+    that reasoning.
+13. Propose tomorrow as the default first review date in `Asia/Dhaka`, while
     allowing manual override.
-13. Save only after the user explicitly says `push_problem` or otherwise
+14. Save only after the user explicitly says `push_problem` or otherwise
     clearly asks to persist the completed reflection.
-14. Invoke one atomic, idempotent `save_reflection` MCP call and report only the
+15. Invoke one atomic, idempotent `save_reflection` MCP call and report only the
     identifiers and due date confirmed by the tool.
 
 If MCP is unavailable, return a valid copyable payload marked **not saved**.
@@ -86,6 +90,16 @@ The extension must not contain database credentials, MCP tokens, or AI calls.
 - Use `(platform, problem_key)` as canonical identity.
 - Keep official problem name only in `title`.
 - Keep source references nullable.
+- Keep Status and State separate:
+  - Status is `backlog`, `attempting`, `pending_ac`, or `accepted`.
+  - State is nullable and otherwise `retry`, `revise`, or `resolve`.
+- Retry means returning to an unsolved problem; Revise means re-solving for
+  speed or fluency; Resolve means re-solving because recall or confidence is
+  weak.
+- Preserve Status and State when archiving; archive is a nullable timestamp,
+  not another Status.
+- Implement Pending AC as a saved view, never as a tag or duplicated badge.
+- Do not invent accepted verdicts for legacy rows without reliable evidence.
 - Never overwrite raw transcripts.
 - Do not import old Notion problem rows until the user explicitly authorizes
   the migration after reviewing a dry-run report.

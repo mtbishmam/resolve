@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { CaptureSchema, TranscriptMessageSchema } from "@/lib/contracts";
+import {
+  CaptureSchema,
+  SaveReflectionSchema,
+  TranscriptMessageSchema,
+} from "@/lib/contracts";
 import { expectedSourceFilename, normalizeProblemUrl } from "@/lib/identity";
 import {
   INITIAL_INTERVALS,
@@ -112,5 +116,61 @@ describe("append-only transcript and schedule contracts", () => {
       unresolved: 1,
     });
     expect(nextReviewDate("2026-07-30", "recalled")).toBe("2026-08-13");
+  });
+});
+
+describe("reflection difficulty contract", () => {
+  const input = {
+    idempotency_key: "difficulty-contract-test",
+    problem: {
+      platform: "cses" as const,
+      problem_key: "1668",
+      url: "https://cses.fi/problemset/task/1668/",
+      title: "Building Teams",
+      contest: "CSES Graph Algorithms",
+      problem_index: null,
+      rating: null,
+      official_tags: [],
+      statement_markdown: "Assign every pupil to one of two teams.",
+      statement_assets: [],
+      metadata_status: "complete",
+      metadata_provenance: {},
+    },
+    reflection: {
+      source_path: null,
+      source_snapshot: null,
+      source_status: "missing" as const,
+      transcript_messages: [],
+      summary_markdown: "Bipartite coloring.",
+      structured_summary: {},
+      memory_cue: "Two colors.",
+      confidence: null,
+      first_review_date: "2026-07-31",
+    },
+  };
+
+  it("requires adaptive difficulty for an unrated problem", () => {
+    expect(SaveReflectionSchema.safeParse(input).success).toBe(false);
+    expect(
+      SaveReflectionSchema.parse({
+        ...input,
+        problem: { ...input.problem, difficulty: "easy" },
+      }).problem.difficulty,
+    ).toBe("easy");
+  });
+
+  it("derives difficulty later when a numeric rating is present", () => {
+    expect(
+      SaveReflectionSchema.parse({
+        ...input,
+        problem: {
+          ...input.problem,
+          platform: "codeforces",
+          problem_key: "1554:B",
+          url: "https://codeforces.com/contest/1554/problem/B",
+          rating: 1700,
+        },
+      }).problem.difficulty,
+    ).toBeUndefined();
   });
 });

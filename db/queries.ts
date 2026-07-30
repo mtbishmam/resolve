@@ -4,27 +4,15 @@ import type {
   RecordReviewInput,
   SaveReflectionInput,
 } from "@/lib/contracts";
+import { difficultyFromRating, type Difficulty } from "@/lib/difficulty";
 import { normalizeProblemUrl } from "@/lib/identity";
 import { nextReviewDate, SCHEDULE_VERSION } from "@/lib/schedule";
 import { sanitizeStatementMarkdown } from "@/lib/sanitize";
+import type { ProblemState, ProblemStatus } from "@/lib/workflow";
 import { getD1 } from "./index";
 
-type ListRow = {
-  id: string;
-  platform: "codeforces" | "cses";
-  problem_key: string;
-  title: string;
-  contest: string | null;
-  problem_index: string | null;
-  rating: number | null;
-  review_status: string;
-  next_review_date: string | null;
-  source_status: string | null;
-  updated_at: string;
-};
-
-function parseJson<T>(value: string | null, fallback: T): T {
-  if (!value) return fallback;
+function parseJson<T>(value: unknown, fallback: T): T {
+  if (typeof value !== "string" || !value) return fallback;
   try {
     return JSON.parse(value) as T;
   } catch {
@@ -32,19 +20,35 @@ function parseJson<T>(value: string | null, fallback: T): T {
   }
 }
 
-function listItem(row: ListRow): ProblemListItem {
+async function sha256(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return [...new Uint8Array(digest)]
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+function listItem(row: Record<string, unknown>): ProblemListItem {
   return {
-    id: row.id,
-    platform: row.platform,
-    problemKey: row.problem_key,
-    title: row.title,
-    contest: row.contest,
-    problemIndex: row.problem_index,
-    rating: row.rating,
-    reviewStatus: row.review_status,
-    nextReviewDate: row.next_review_date,
-    sourceStatus: row.source_status,
-    updatedAt: row.updated_at,
+    id: String(row.id),
+    platform: row.platform as "codeforces" | "cses",
+    problemKey: String(row.problem_key),
+    title: String(row.title),
+    contest: (row.contest as string | null) ?? null,
+    problemIndex: (row.problem_index as string | null) ?? null,
+    rating: (row.rating as number | null) ?? null,
+    difficulty: (row.difficulty as Difficulty | null) ?? null,
+    state: (row.state as ProblemState | null) ?? null,
+    status: (row.status as ProblemStatus | null) ?? null,
+    archivedAt: (row.archived_at as string | null) ?? null,
+    dueDate: (row.due_date as string | null) ?? null,
+    sprintId: (row.sprint_id as string | null) ?? null,
+    nextReviewDate: (row.next_review_date as string | null) ?? null,
+    officialTags: parseJson(row.official_tags_json, []),
+    sourceStatus: (row.source_status as string | null) ?? null,
+    updatedAt: String(row.updated_at),
   };
 }
 
@@ -53,8 +57,9 @@ export async function listProblems() {
   const result = await d1
     .prepare(
       `SELECT p.id, p.platform, p.problem_key, p.title, p.contest,
-              p.problem_index, p.rating, p.review_status, p.next_review_date,
-              r.source_status, p.updated_at
+              p.problem_index, p.rating, p.difficulty, p.state, p.status,
+              p.archived_at, p.due_date, p.sprint_id, p.next_review_date,
+              p.official_tags_json, r.source_status, p.updated_at
        FROM problems p
        LEFT JOIN reflections r ON r.id = (
          SELECT r2.id FROM reflections r2
@@ -63,7 +68,7 @@ export async function listProblems() {
        )
        ORDER BY p.updated_at DESC`,
     )
-    .all<ListRow>();
+    .all<Record<string, unknown>>();
   return (result.results ?? []).map(listItem);
 }
 
@@ -73,22 +78,13 @@ export async function getProblemById(
   const d1 = await getD1();
   const problem = await d1
     .prepare(
-      `SELECT p.*,
-              r.id AS reflection_id,
-              r.source_path,
-              r.source_snapshot,
-              r.source_status,
-              r.transcript_messages_json,
-              r.summary_markdown,
-              r.structured_summary_json,
-              r.memory_cue,
-              r.confidence,
-              r.first_review_date,
-              r.created_at AS reflection_created_at
+      `SELECT p.*, r.id AS reflection_id, r.source_path, r.source_snapshot,
+              r.source_status, r.transcript_messages_json, r.summary_markdown,
+              r.structured_summary_json, r.memory_cue, r.confidence,
+              r.first_review_date, r.created_at AS reflection_created_at
        FROM problems p
        LEFT JOIN reflections r ON r.id = (
-         SELECT r2.id FROM reflections r2
-         WHERE r2.problem_id = p.id
+         SELECT r2.id FROM reflections r2 WHERE r2.problem_id = p.id
          ORDER BY r2.created_at DESC LIMIT 1
        )
        WHERE p.id = ?1`,
@@ -99,61 +95,45 @@ export async function getProblemById(
   const reviewResult = await d1
     .prepare(
       `SELECT id, due_date, reviewed_at, outcome, deepest_reveal, recall_note,
-              next_review_date, schedule_version
-       FROM reviews WHERE problem_id = ?1
-       ORDER BY created_at DESC`,
+              next_review_date, schedule_version, timer_limit_seconds,
+              timer_elapsed_seconds
+       FROM reviews WHERE problem_id = ?1 ORDER BY created_at DESC`,
     )
     .bind(id)
-    .all<Record<string, string | null>>();
-
+    .all<Record<string, unknown>>();
+  const base = listItem(problem);
   return {
-    id: String(problem.id),
-    platform: problem.platform as "codeforces" | "cses",
-    problemKey: String(problem.problem_key),
-    title: String(problem.title),
-    contest: (problem.contest as string | null) ?? null,
-    problemIndex: (problem.problem_index as string | null) ?? null,
-    rating: (problem.rating as number | null) ?? null,
-    reviewStatus: String(problem.review_status),
-    nextReviewDate: (problem.next_review_date as string | null) ?? null,
-    sourceStatus: (problem.source_status as string | null) ?? null,
-    updatedAt: String(problem.updated_at),
+    ...base,
     url: String(problem.url),
-    officialTags: parseJson(String(problem.official_tags_json), []),
+    officialTags: parseJson(problem.official_tags_json, []),
     statementMarkdown: String(problem.statement_markdown),
-    statementAssets: parseJson(String(problem.statement_assets_json), []),
+    statementAssets: parseJson(problem.statement_assets_json, []),
     statementCapturedAt:
       (problem.statement_captured_at as string | null) ?? null,
     metadataStatus: String(problem.metadata_status),
-    metadataProvenance: parseJson(String(problem.metadata_provenance_json), {}),
-    legacyMetadata: parseJson(String(problem.legacy_metadata_json), {}),
+    metadataProvenance: parseJson(problem.metadata_provenance_json, {}),
+    legacyMetadata: parseJson(problem.legacy_metadata_json, {}),
     importSource: (problem.import_source as string | null) ?? null,
-    importProvenance: parseJson(String(problem.import_provenance_json), {}),
+    importProvenance: parseJson(problem.import_provenance_json, {}),
     reflection: problem.reflection_id
       ? {
           id: String(problem.reflection_id),
           sourcePath: (problem.source_path as string | null) ?? null,
           sourceSnapshot: (problem.source_snapshot as string | null) ?? null,
           sourceStatus: String(problem.source_status),
-          transcriptMessages: parseJson(
-            String(problem.transcript_messages_json),
-            [],
-          ),
+          transcriptMessages: parseJson(problem.transcript_messages_json, []),
           summaryMarkdown: String(problem.summary_markdown),
-          structuredSummary: parseJson(
-            String(problem.structured_summary_json),
-            {
-              key_insight: "Not captured",
-              wrong_mental_model: "Not captured",
-              why_it_seemed_reasonable: "Not captured",
-              breakthrough_observation: "Not captured",
-              correct_trigger: "Not captured",
-              missing_concepts: [],
-              general_pattern: "Not captured",
-              cognitive_mistakes: [],
-              provenance: {},
-            },
-          ),
+          structuredSummary: parseJson(problem.structured_summary_json, {
+            key_insight: "Not captured",
+            wrong_mental_model: "Not captured",
+            why_it_seemed_reasonable: "Not captured",
+            breakthrough_observation: "Not captured",
+            correct_trigger: "Not captured",
+            missing_concepts: [],
+            general_pattern: "Not captured",
+            cognitive_mistakes: [],
+            provenance: {},
+          }),
           memoryCue: String(problem.memory_cue),
           confidence: (problem.confidence as number | null) ?? null,
           firstReviewDate: (problem.first_review_date as string | null) ?? null,
@@ -163,12 +143,20 @@ export async function getProblemById(
     reviews: (reviewResult.results ?? []).map((review) => ({
       id: String(review.id),
       dueDate: String(review.due_date),
-      reviewedAt: review.reviewed_at,
-      outcome: review.outcome,
-      deepestReveal: review.deepest_reveal,
-      recallNote: review.recall_note,
-      nextReviewDate: review.next_review_date,
+      reviewedAt: (review.reviewed_at as string | null) ?? null,
+      outcome: (review.outcome as string | null) ?? null,
+      deepestReveal: (review.deepest_reveal as string | null) ?? null,
+      recallNote: (review.recall_note as string | null) ?? null,
+      nextReviewDate: (review.next_review_date as string | null) ?? null,
       scheduleVersion: String(review.schedule_version),
+      timerLimitSeconds:
+        review.timer_limit_seconds == null
+          ? null
+          : Number(review.timer_limit_seconds),
+      timerElapsedSeconds:
+        review.timer_elapsed_seconds == null
+          ? null
+          : Number(review.timer_elapsed_seconds),
     })),
   };
 }
@@ -185,29 +173,15 @@ export async function getProblemByIdentity(
   return row ? getProblemById(row.id) : null;
 }
 
-async function sha256(value: string) {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(value),
-  );
-  return [...new Uint8Array(digest)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
-
 export async function saveReflection(input: SaveReflectionInput) {
   const d1 = await getD1();
   const duplicate = await d1
     .prepare(
-      `SELECT r.id AS reflection_id, r.problem_id, r.first_review_date
-       FROM reflections r WHERE r.idempotency_key = ?1`,
+      `SELECT id AS reflection_id, problem_id, first_review_date
+       FROM reflections WHERE idempotency_key = ?1`,
     )
     .bind(input.idempotency_key)
-    .first<{
-      reflection_id: string;
-      problem_id: string;
-      first_review_date: string | null;
-    }>();
+    .first<Record<string, string | null>>();
   if (duplicate) return { ...duplicate, duplicate: true };
 
   const normalized = normalizeProblemUrl(input.problem.url);
@@ -225,92 +199,104 @@ export async function saveReflection(input: SaveReflectionInput) {
     .first<{ id: string }>();
   const problemId = existing?.id ?? crypto.randomUUID();
   const reflectionId = crypto.randomUUID();
-  const sanitizedStatement = sanitizeStatementMarkdown(
+  const statement = sanitizeStatementMarkdown(
     input.problem.statement_markdown,
     input.problem.url,
   );
   const transcriptJson = JSON.stringify(input.reflection.transcript_messages);
-
-  const statements = [
-    d1
-      .prepare(
-        `INSERT INTO problems (
-          id, platform, problem_key, url, title, contest, problem_index, rating,
-          official_tags_json, statement_markdown, statement_assets_json,
-          statement_hash, statement_captured_at, metadata_status,
-          metadata_provenance_json, legacy_metadata_json, import_source,
-          import_provenance_json, review_status, next_review_date, created_at,
-          updated_at
-        ) VALUES (
-          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
-          ?15, '{}', NULL, '{}', 'resolve', ?16, ?17, ?17
-        )
-        ON CONFLICT(platform, problem_key) DO UPDATE SET
-          url = excluded.url,
-          title = excluded.title,
-          contest = excluded.contest,
-          problem_index = excluded.problem_index,
-          rating = excluded.rating,
-          official_tags_json = excluded.official_tags_json,
-          statement_markdown = excluded.statement_markdown,
-          statement_assets_json = excluded.statement_assets_json,
-          statement_hash = excluded.statement_hash,
-          statement_captured_at = excluded.statement_captured_at,
-          metadata_status = excluded.metadata_status,
-          metadata_provenance_json = excluded.metadata_provenance_json,
-          next_review_date = excluded.next_review_date,
-          updated_at = excluded.updated_at`,
-      )
-      .bind(
-        problemId,
-        input.problem.platform,
-        input.problem.problem_key,
-        normalized.canonicalUrl,
-        input.problem.title.trim(),
-        input.problem.contest ?? null,
-        input.problem.problem_index ?? null,
-        input.problem.rating ?? null,
-        JSON.stringify(input.problem.official_tags),
-        sanitizedStatement,
-        JSON.stringify(input.problem.statement_assets),
-        await sha256(sanitizedStatement),
-        now,
-        input.problem.metadata_status,
-        JSON.stringify(input.problem.metadata_provenance),
-        input.reflection.first_review_date,
-        now,
-      ),
-    d1
-      .prepare(
-        `INSERT INTO reflections (
-          id, idempotency_key, problem_id, source_path, source_snapshot,
-          source_status, transcript_messages_json, transcript_hash,
-          summary_markdown, structured_summary_json, memory_cue, confidence,
-          first_review_date, created_at
-        ) VALUES (
-          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14
-        )`,
-      )
-      .bind(
-        reflectionId,
-        input.idempotency_key,
-        problemId,
-        input.reflection.source_path ?? null,
-        input.reflection.source_snapshot ?? null,
-        input.reflection.source_status,
-        transcriptJson,
-        await sha256(transcriptJson),
-        input.reflection.summary_markdown,
-        JSON.stringify(input.reflection.structured_summary),
-        input.reflection.memory_cue,
-        input.reflection.confidence ?? null,
-        input.reflection.first_review_date,
-        now,
-      ),
-  ];
+  const rating = input.problem.rating ?? null;
+  const difficulty =
+    rating === null
+      ? (input.problem.difficulty ?? null)
+      : difficultyFromRating(rating);
+  const metadataProvenance = {
+    ...input.problem.metadata_provenance,
+    difficulty:
+      rating === null ? "codex_adaptive_v1" : "codeforces_rating_band_v1",
+  };
 
   try {
-    await d1.batch(statements);
+    await d1.batch([
+      d1
+        .prepare(
+          `INSERT INTO problems (
+            id, platform, problem_key, url, title, contest, problem_index,
+            rating, difficulty, official_tags_json, statement_markdown,
+            statement_assets_json, statement_hash, statement_captured_at,
+            metadata_status, metadata_provenance_json, legacy_metadata_json,
+            import_source, import_provenance_json, review_status, state, status,
+            due_date, sprint_id, next_review_date, created_at, updated_at
+          ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14,
+            ?15, ?16, '{}', NULL, '{}', ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?23
+          )
+          ON CONFLICT(platform, problem_key) DO UPDATE SET
+            url=excluded.url, title=excluded.title, contest=excluded.contest,
+            problem_index=excluded.problem_index, rating=excluded.rating,
+            difficulty=excluded.difficulty,
+            official_tags_json=excluded.official_tags_json,
+            statement_markdown=excluded.statement_markdown,
+            statement_assets_json=excluded.statement_assets_json,
+            statement_hash=excluded.statement_hash,
+            statement_captured_at=excluded.statement_captured_at,
+            metadata_status=excluded.metadata_status,
+            metadata_provenance_json=excluded.metadata_provenance_json,
+            next_review_date=excluded.next_review_date,
+            updated_at=excluded.updated_at`,
+        )
+        .bind(
+          problemId,
+          input.problem.platform,
+          input.problem.problem_key,
+          normalized.canonicalUrl,
+          input.problem.title.trim(),
+          input.problem.contest ?? null,
+          input.problem.problem_index ?? null,
+          rating,
+          difficulty,
+          JSON.stringify(input.problem.official_tags),
+          statement,
+          JSON.stringify(input.problem.statement_assets),
+          await sha256(statement),
+          now,
+          input.problem.metadata_status,
+          JSON.stringify(metadataProvenance),
+          input.problem.state ?? "resolve",
+          input.problem.state ?? null,
+          input.problem.status,
+          input.problem.due_date ?? null,
+          input.problem.sprint_id ?? null,
+          input.reflection.first_review_date,
+          now,
+        ),
+      d1
+        .prepare(
+          `INSERT INTO reflections (
+            id, idempotency_key, problem_id, source_path, source_snapshot,
+            source_status, transcript_messages_json, transcript_hash,
+            summary_markdown, structured_summary_json, memory_cue, confidence,
+            first_review_date, created_at
+          ) VALUES (
+            ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14
+          )`,
+        )
+        .bind(
+          reflectionId,
+          input.idempotency_key,
+          problemId,
+          input.reflection.source_path ?? null,
+          input.reflection.source_snapshot ?? null,
+          input.reflection.source_status,
+          transcriptJson,
+          await sha256(transcriptJson),
+          input.reflection.summary_markdown,
+          JSON.stringify(input.reflection.structured_summary),
+          input.reflection.memory_cue,
+          input.reflection.confidence ?? null,
+          input.reflection.first_review_date,
+          now,
+        ),
+    ]);
   } catch (error) {
     const raced = await d1
       .prepare(
@@ -318,11 +304,7 @@ export async function saveReflection(input: SaveReflectionInput) {
          FROM reflections WHERE idempotency_key = ?1`,
       )
       .bind(input.idempotency_key)
-      .first<{
-        reflection_id: string;
-        problem_id: string;
-        first_review_date: string | null;
-      }>();
+      .first<Record<string, string | null>>();
     if (raced) return { ...raced, duplicate: true };
     throw error;
   }
@@ -335,10 +317,11 @@ export async function saveReflection(input: SaveReflectionInput) {
 }
 
 export async function listDueReviews(date: string) {
-  const problems = await listProblems();
-  return problems.filter(
+  return (await listProblems()).filter(
     (problem) =>
-      problem.nextReviewDate !== null && problem.nextReviewDate <= date,
+      problem.archivedAt === null &&
+      problem.nextReviewDate !== null &&
+      problem.nextReviewDate <= date,
   );
 }
 
@@ -350,9 +333,8 @@ export async function recordReview(input: RecordReviewInput) {
        FROM reviews WHERE idempotency_key = ?1`,
     )
     .bind(input.idempotency_key)
-    .first<{ review_id: string; next_review_date: string | null }>();
+    .first<Record<string, string | null>>();
   if (duplicate) return { ...duplicate, duplicate: true };
-
   const today = new Intl.DateTimeFormat("en-CA", {
     timeZone: "Asia/Dhaka",
     year: "numeric",
@@ -369,9 +351,10 @@ export async function recordReview(input: RecordReviewInput) {
         `INSERT INTO reviews (
           id, idempotency_key, problem_id, reflection_id, due_date, reviewed_at,
           outcome, deepest_reveal, recall_note, previous_interval_days,
-          next_review_date, schedule_version, created_at
+          next_review_date, schedule_version, timer_limit_seconds,
+          timer_elapsed_seconds, created_at
         ) VALUES (
-          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?6
+          ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?6
         )`,
       )
       .bind(
@@ -387,16 +370,16 @@ export async function recordReview(input: RecordReviewInput) {
         input.previous_interval_days ?? null,
         nextDate,
         SCHEDULE_VERSION,
+        input.timer_limit_seconds ?? null,
+        input.timer_elapsed_seconds ?? null,
       ),
     d1
       .prepare(
         `UPDATE problems
          SET next_review_date = ?1,
-             review_status = CASE
-               WHEN ?2 = 'recalled' THEN 'revise'
-               WHEN ?2 = 'needed_cue' THEN 'revise'
-               WHEN ?2 = 'forgot' THEN 'retry'
-               ELSE 'resolve'
+             archived_at = CASE
+               WHEN state = 'revise' AND ?2 = 'recalled' THEN ?3
+               ELSE archived_at
              END,
              updated_at = ?3
          WHERE id = ?4`,
@@ -410,34 +393,125 @@ export async function updateProblemProperties(
   id: string,
   input: {
     rating?: number | null;
-    reviewStatus?: "retry" | "revise" | "resolve";
+    difficulty?: Difficulty | null;
+    state?: ProblemState | null;
+    status?: ProblemStatus | null;
+    archived?: boolean;
+    dueDate?: string | null;
     nextReviewDate?: string | null;
+    officialTags?: string[];
   },
 ) {
   const d1 = await getD1();
   const current = await d1
     .prepare(
-      "SELECT rating, review_status, next_review_date FROM problems WHERE id = ?1",
+      `SELECT rating, difficulty, state, status, archived_at, due_date,
+              next_review_date, official_tags_json
+       FROM problems WHERE id = ?1`,
     )
     .bind(id)
-    .first<{
-      rating: number | null;
-      review_status: string;
-      next_review_date: string | null;
-    }>();
+    .first<Record<string, unknown>>();
   if (!current) return false;
+  const rating =
+    input.rating === undefined
+      ? ((current.rating as number | null) ?? null)
+      : input.rating;
+  const difficulty =
+    rating !== null
+      ? difficultyFromRating(rating)
+      : input.difficulty !== undefined
+        ? input.difficulty
+        : input.rating === null
+          ? null
+          : ((current.difficulty as Difficulty | null) ?? null);
+  const provenance =
+    difficulty === null
+      ? null
+      : rating !== null
+        ? "codeforces_rating_band_v1"
+        : "manual_property_edit_v1";
+  const state =
+    input.state === undefined
+      ? ((current.state as ProblemState | null) ?? null)
+      : input.state;
+  const status =
+    input.status === undefined
+      ? ((current.status as ProblemStatus | null) ?? null)
+      : input.status;
+  const archivedAt =
+    input.archived === undefined
+      ? ((current.archived_at as string | null) ?? null)
+      : input.archived
+        ? new Date().toISOString()
+        : null;
+  const tags =
+    input.officialTags === undefined
+      ? parseJson<string[]>(current.official_tags_json, [])
+      : [
+          ...new Set(
+            input.officialTags.map((tag) => tag.trim()).filter(Boolean),
+          ),
+        ];
+  const now = new Date().toISOString();
   await d1
     .prepare(
-      `UPDATE problems SET rating = ?1, review_status = ?2,
-       next_review_date = ?3, updated_at = ?4 WHERE id = ?5`,
+      `UPDATE problems SET rating=?1, difficulty=?2, state=?3,
+       review_status=COALESCE(?3, review_status), status=?4, archived_at=?5,
+       due_date=?6, next_review_date=?7, official_tags_json=?8,
+       metadata_provenance_json=CASE WHEN ?9 IS NULL
+         THEN json_remove(metadata_provenance_json, '$.difficulty')
+         ELSE json_set(metadata_provenance_json, '$.difficulty', ?9) END,
+       updated_at=?10 WHERE id=?11`,
     )
     .bind(
-      input.rating === undefined ? current.rating : input.rating,
-      input.reviewStatus ?? current.review_status,
+      rating,
+      difficulty,
+      state,
+      status,
+      archivedAt,
+      input.dueDate === undefined ? current.due_date : input.dueDate,
       input.nextReviewDate === undefined
         ? current.next_review_date
         : input.nextReviewDate,
-      new Date().toISOString(),
+      JSON.stringify(tags),
+      provenance,
+      now,
+      id,
+    )
+    .run();
+  return true;
+}
+
+export async function updateReflection(
+  id: string,
+  input: {
+    summaryMarkdown?: string;
+    structuredSummary?: Record<string, unknown>;
+    memoryCue?: string;
+    confidence?: number | null;
+  },
+) {
+  const d1 = await getD1();
+  const current = await d1
+    .prepare(
+      `SELECT summary_markdown, structured_summary_json, memory_cue, confidence
+       FROM reflections WHERE id=?1`,
+    )
+    .bind(id)
+    .first<Record<string, unknown>>();
+  if (!current) return false;
+  await d1
+    .prepare(
+      `UPDATE reflections SET summary_markdown=?1,
+       structured_summary_json=?2, memory_cue=?3, confidence=?4 WHERE id=?5`,
+    )
+    .bind(
+      input.summaryMarkdown ?? current.summary_markdown,
+      input.structuredSummary === undefined
+        ? current.structured_summary_json
+        : JSON.stringify(input.structuredSummary),
+      input.memoryCue ?? current.memory_cue,
+      input.confidence === undefined ? current.confidence : input.confidence,
       id,
     )
     .run();
@@ -449,23 +523,21 @@ export async function listSavedViews() {
   const result = await d1
     .prepare(
       `SELECT id, name, filter_json, sort_json, visible_columns_json, is_default
-       FROM saved_views ORDER BY is_default DESC, created_at ASC`,
+       FROM saved_views ORDER BY CASE id
+         WHEN 'view-due-today' THEN 1 WHEN 'view-revise' THEN 2
+         WHEN 'view-retry' THEN 3 WHEN 'view-resolve' THEN 4
+         WHEN 'view-all' THEN 5 WHEN 'view-pending-ac' THEN 6
+         WHEN 'view-archived' THEN 7 ELSE 100 END, created_at`,
     )
-    .all<{
-      id: string;
-      name: string;
-      filter_json: string;
-      sort_json: string;
-      visible_columns_json: string;
-      is_default: number;
-    }>();
+    .all<Record<string, unknown>>();
   return (result.results ?? []).map((view) => ({
-    id: view.id,
-    name: view.name,
+    id: String(view.id),
+    name: String(view.name),
     filter: parseJson(view.filter_json, {}),
     sort: parseJson(view.sort_json, []),
     visibleColumns: parseJson(view.visible_columns_json, []),
     isDefault: Boolean(view.is_default),
+    isCore: String(view.id).startsWith("view-"),
   }));
 }
 
@@ -495,4 +567,33 @@ export async function saveCustomView(input: {
     )
     .run();
   return { id };
+}
+
+export async function deleteCustomView(id: string) {
+  if (id.startsWith("view-")) return false;
+  const d1 = await getD1();
+  const result = await d1
+    .prepare("DELETE FROM saved_views WHERE id=?1")
+    .bind(id)
+    .run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
+export async function listSprints() {
+  const d1 = await getD1();
+  const result = await d1
+    .prepare(
+      `SELECT id, name, month, source, target_json, starts_on, ends_on
+       FROM sprints ORDER BY month`,
+    )
+    .all<Record<string, unknown>>();
+  return (result.results ?? []).map((row) => ({
+    id: String(row.id),
+    name: String(row.name),
+    month: String(row.month),
+    source: (row.source as string | null) ?? null,
+    target: parseJson(row.target_json, {}),
+    startsOn: String(row.starts_on),
+    endsOn: String(row.ends_on),
+  }));
 }

@@ -30,7 +30,9 @@ Extreme speed is the number-one product requirement.
 7. Codex conducts an adaptive reflection without revealing official tags until
    the user has explained their reasoning.
 8. Codex preserves the exact interview messages and generates a compact,
-   structured reflection.
+   structured reflection. It derives Codeforces difficulty from rating or
+   adaptively assigns difficulty to an unrated CSES problem after hearing the
+   user's reasoning.
 9. When the user says `push_problem`, Codex invokes one atomic, idempotent
    `save_reflection` MCP tool.
 10. ReSolve saves the problem, statement, reflection, and first review date.
@@ -57,6 +59,13 @@ Extreme speed is the number-one product requirement.
 - Only the approved eight-row private Notion showcase is imported for the MVP;
   the full database remains deferred.
 - In-app due and overdue views come before email reminders.
+- Status tracks `Backlog`, `Attempting`, `Pending AC`, or `Accepted`.
+- Nullable State tracks `Retry`, `Revise`, or `Resolve`:
+  - Retry means returning to an unsolved problem.
+  - Revise means re-solving for speed or fluency.
+  - Resolve means re-solving because recall or confidence is weak.
+- Archiving preserves Status and State instead of acting as another Status.
+- Pending AC is a saved view, not a special tag.
 - Raw interviews are append-only and must never be replaced by a summary.
 - Generated classifications may be regenerated later.
 

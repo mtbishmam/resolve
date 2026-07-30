@@ -45,7 +45,14 @@ try {
   const listed = await rpc("tools/list", {});
   assert.deepEqual(
     listed.result.tools.map((tool) => tool.name),
-    ["save_reflection", "get_problem", "list_due_reviews", "record_review"],
+    [
+      "save_reflection",
+      "get_problem",
+      "list_due_reviews",
+      "record_review",
+      "update_problem",
+      "update_reflection",
+    ],
   );
   const input = {
     idempotency_key: "mcp-test-save-9999-a",
@@ -65,6 +72,8 @@ try {
       ],
       metadata_status: "complete",
       metadata_provenance: { title: "test_fixture" },
+      state: "retry",
+      status: "backlog",
     },
     reflection: {
       source_path: null,
@@ -101,7 +110,14 @@ try {
     JSON.stringify(stored.reflection.transcriptMessages),
     JSON.stringify(transcript),
   );
+  assert.equal(stored.state, "retry");
+  assert.equal(stored.status, "backlog");
   assert.equal(stored.reflection.sourceStatus, "missing");
+  assert.equal(stored.difficulty, "easy");
+  assert.equal(
+    stored.metadataProvenance.difficulty,
+    "codeforces_rating_band_v1",
+  );
 
   const due = await call("list_due_reviews", { date: "2026-07-31" });
   assert(due.some((problem) => problem.id === first.problem_id));
@@ -128,12 +144,31 @@ try {
   });
   assert.equal(review.review_id, duplicateReview.review_id);
   assert.equal(duplicateReview.duplicate, true);
-  console.log("All four MCP tools passed.");
+  const updatedProblem = await call("update_problem", {
+    problem_id: first.problem_id,
+    status: "pending_ac",
+    official_tags: ["math", "implementation"],
+  });
+  assert.equal(updatedProblem.updated, true);
+  const updatedReflection = await call("update_reflection", {
+    reflection_id: first.reflection_id,
+    memoryCue: "Edited fixture cue",
+  });
+  assert.equal(updatedReflection.updated, true);
+  const afterUpdate = await call("get_problem", {
+    platform: "codeforces",
+    problem_key: "9999:A",
+  });
+  assert.equal(afterUpdate.status, "pending_ac");
+  assert.equal(afterUpdate.state, "retry");
+  assert.equal(afterUpdate.reflection.memoryCue, "Edited fixture cue");
+  console.log("All six MCP tools passed.");
 } finally {
   const wrangler = resolve(root, "node_modules", ".bin", "wrangler");
   execFileSync(
-    wrangler,
+    process.execPath,
     [
+      wrangler,
       "d1",
       "execute",
       "resolve-local",

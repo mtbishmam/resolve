@@ -1,14 +1,24 @@
 import { z } from "zod";
 import { authorizeBrowserRequest } from "@/lib/auth";
+import {
+  DifficultySchema,
+  ProblemStateSchema,
+  ProblemStatusSchema,
+} from "@/lib/contracts";
 import { getProblemById, updateProblemProperties } from "@/db/queries";
 
 export const dynamic = "force-dynamic";
 
 const UpdateSchema = z
   .object({
-    rating: z.number().int().positive().nullable().optional(),
-    reviewStatus: z.enum(["retry", "revise", "resolve"]).optional(),
+    rating: z.number().int().positive().max(3500).nullable().optional(),
+    difficulty: DifficultySchema.nullable().optional(),
+    state: ProblemStateSchema.nullable().optional(),
+    status: ProblemStatusSchema.nullable().optional(),
+    archived: z.boolean().optional(),
+    dueDate: z.string().date().nullable().optional(),
     nextReviewDate: z.string().date().nullable().optional(),
+    officialTags: z.array(z.string().min(1).max(80)).max(100).optional(),
   })
   .strict();
 

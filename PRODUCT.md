@@ -1,5 +1,11 @@
 # Product
 
+ReSolve has two independent workflow axes: review **State** and solve
+**Status**. Monthly Sprints turn a fixed practice sheet into daily due dates
+without inventing missing problems. August 2026 targets the 1600, 1700, 1800,
+and 1900 CP31 bands at five problems per day, one seven-day block per band;
+September remains to be decided.
+
 ## Product vocabulary
 
 - **Capture**: versioned problem data produced by the browser extension.
@@ -9,6 +15,8 @@
   approach without exposing the complete answer.
 - **Review**: a progressive active-recall attempt recorded as history.
 - **Saved view**: a reusable filter and sort definition.
+- **Status**: the objective progress of the initial solve and judge submission.
+- **State**: the nullable learning action currently queued for the problem.
 
 ## Capture and reflection
 
@@ -17,8 +25,9 @@ hold database credentials, or write directly to ReSolve.
 
 Codex is the reflection interface. It reads the capture, optionally reads the
 user's solution, asks adaptive questions, preserves exact user wording,
-generates structured knowledge, proposes a first review date, and saves through
-MCP only after the user explicitly requests it.
+generates structured knowledge, assigns unrated problems an adaptive difficulty
+after hearing the user's reasoning, proposes a first review date, and saves
+through MCP only after the user explicitly requests it.
 
 The structured reflection should capture:
 
@@ -52,6 +61,50 @@ Mobile:
 
 The problem name is the primary visible identifier. Platform and contest
 metadata are secondary.
+
+### Status and State
+
+Status tracks objective progress:
+
+- **Backlog**: not started and saved for later.
+- **Attempting**: started but not yet solved locally.
+- **Pending AC**: solved locally but not yet accepted by the judge.
+- **Accepted**: received an accepted judge verdict.
+
+State tracks the next learning action and may be empty:
+
+- **Retry**: return to an unsolved problem and attempt it again.
+- **Revise**: re-solve a solved problem to improve speed or fluency.
+- **Resolve**: reconstruct a solved problem when confidence or recall is weak.
+
+Backlog may not have a State. Attempting may have Retry or no State. Pending AC
+and Accepted may have Revise, Resolve, or no State. A failed submission returns
+the problem to Attempting and may set Retry.
+
+No separate Done value is needed; an empty State means that no learning action
+is currently queued. Status and State are not topic tags.
+
+Archiving is independent of Status and State. An archived problem retains both
+values, is hidden from normal views, and can be restored without losing its
+workflow position.
+
+**Pending AC** is a saved view filtered to active problems whose Status is
+Pending AC. It is not represented by a `!AC` tag or badge.
+
+Difficulty is a separate single-select property:
+
+- Easy: rating below 1600
+- Medium: rating from 1600 through 2399
+- Hard: rating from 2400 through 2999
+- Extreme: rating from 3000 through 3500
+
+Codeforces difficulty is derived from its numeric rating. Unrated CSES
+difficulty is assigned adaptively by Codex during reflection rather than copied
+from a generic external list.
+
+Rating filtering uses inclusive start and end fields. Supplying only one field
+means an exact-rating query. An unrated problem matches a numeric range when its
+difficulty band overlaps that range.
 
 ## Statement reader
 

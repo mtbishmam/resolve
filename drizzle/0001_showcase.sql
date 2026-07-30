@@ -62,7 +62,7 @@ So the maximum is $$$f(1, 2) = -1$$$.
 
 In the fourth test case, the maximum is $$$f(3, 4) = 12$$$.', '[]',
   '61157741a0fc17c83e943ceb357df98a8409dd3837dae2deb312e48c8e95adb2', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"codeforces_api","rating":"codeforces_api","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"a[i] <= n, means that the maximum value of any (a[i] | a[j]) can be atmost 2 * n\ni * j / a[i] | a[j] for all pairs cannot be calculated fast enough anyhow\nThe fact that a[i] <= n && k <= 100 both combined the critical factor","Metacognition":"// why is k so small?\n// a[i] <= n?\n\n/* Lemmas\n    1. We''ll have to do an exhaustive search\n*/\n\n/* Solutions\n    1. per bit by bit operation?\n    2. brute force to deduce pattern\n    3. binary search?\n*/\n\n/* Problems\n    I don''t know how to do i * j fast for all pairs yet\n    I don''t know how to do (ai | aj) for all pairs yet\n    I can''t figure out what small k implies yet\n    Does a[i] <= n imply something?\n*/","Tags":["Retry","Bitwise","All Pairs"],"Difficulty":"1700"}}', 'notion_showcase_v1',
+  '{"title":"codeforces_api","rating":"codeforces_api","difficulty":"codeforces_rating_band_v1","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"a[i] <= n, means that the maximum value of any (a[i] | a[j]) can be atmost 2 * n\ni * j / a[i] | a[j] for all pairs cannot be calculated fast enough anyhow\nThe fact that a[i] <= n && k <= 100 both combined the critical factor","Metacognition":"// why is k so small?\n// a[i] <= n?\n\n/* Lemmas\n    1. We''ll have to do an exhaustive search\n*/\n\n/* Solutions\n    1. per bit by bit operation?\n    2. brute force to deduce pattern\n    3. binary search?\n*/\n\n/* Problems\n    I don''t know how to do i * j fast for all pairs yet\n    I don''t know how to do (ai | aj) for all pairs yet\n    I can''t figure out what small k implies yet\n    Does a[i] <= n imply something?\n*/","Tags":["Retry","Bitwise","All Pairs"],"Difficulty":"1700"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/2a4f02b8a3264c268248b292b7aac3b2","selected_because":"Strong Retry example with detailed constraint-driven metacognition and a reusable brute-force bound.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'retry', '2026-07-30',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -179,7 +179,7 @@ Fifth test case.
 
 Sixth test case. Here both houses are located at $$$(0, 0)$$$.', '[]',
   '7cd50292cf0bde7c1b7a840dca7ac840a308f4c3c3e551167f307ccc744c8ca1', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"codeforces_api","rating":"codeforces_api","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":"A good problem about manhattan distance","Gains":"Should''ve thought about medians and such, need to implement a method that atleast makes me consider those options. Another important lesson: for geometry problems if we can solve it for one dimension, then we can maybe extend it to two dimensions","Metacognition":"/* Analysis\n    The minimum distance between any two points is the min di\n    after getting the min_dis, we''ll just check how many pairs have that min_dis?\n\n*/\n\n/* Sols\n    1. get min distance between any pair of nodes\n    then, get the node with the maxmum number of\n\n    2. Compress all coordinates, then get the lower and upper bounds on both x & y and do a n^2 solution?\n*/","Tags":["Retry","Lesson","Geometry"],"Difficulty":"1500"}}', 'notion_showcase_v1',
+  '{"title":"codeforces_api","rating":"codeforces_api","difficulty":"codeforces_rating_band_v1","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":"A good problem about manhattan distance","Gains":"Should''ve thought about medians and such, need to implement a method that atleast makes me consider those options. Another important lesson: for geometry problems if we can solve it for one dimension, then we can maybe extend it to two dimensions","Metacognition":"/* Analysis\n    The minimum distance between any two points is the min di\n    after getting the min_dis, we''ll just check how many pairs have that min_dis?\n\n*/\n\n/* Sols\n    1. get min distance between any pair of nodes\n    then, get the node with the maxmum number of\n\n    2. Compress all coordinates, then get the lower and upper bounds on both x & y and do a n^2 solution?\n*/","Tags":["Retry","Lesson","Geometry"],"Difficulty":"1500"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/31325e4e074344fe9ce199d31f3fd468","selected_because":"Detailed Retry geometry row showing an incorrect distance model and a clear median trigger.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'retry', '2026-07-29',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -313,7 +313,7 @@ In the first test case, the dominoes can be divided as follows:
 
 In the second test case, there''s no way to divide dominoes into $$$2$$$ sets, at least one of them will contain repeated number.', '[]',
   '845d31e08b0e955aa51fe016c843deabfc047773c44e18d5813952960edd74b8', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"codeforces_api","rating":"codeforces_api","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"If the question asks you to divide between two  sets or similar think about bipartite check. Here, the division is between the edges rather than the nodes, and we’re checking if a bipartition is possible or not.\nBipartite Check = even-length cycles, which means no odd-length cycles can be present. So, we can use a bipartite check to find out even-length cycles as well","Metacognition":null,"Tags":["Resolve","Bipartite Check","Lesson"],"Difficulty":"1600"}}', 'notion_showcase_v1',
+  '{"title":"codeforces_api","rating":"codeforces_api","difficulty":"codeforces_rating_band_v1","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"If the question asks you to divide between two  sets or similar think about bipartite check. Here, the division is between the edges rather than the nodes, and we’re checking if a bipartition is possible or not.\nBipartite Check = even-length cycles, which means no odd-length cycles can be present. So, we can use a bipartite check to find out even-length cycles as well","Metacognition":null,"Tags":["Resolve","Bipartite Check","Lesson"],"Difficulty":"1600"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/3f42663170344d0ea7ebe9c58afc7d51","selected_because":"Resolve example with a strong recognition trigger connecting two-set division to bipartiteness.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'resolve', '2026-07-30',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -422,7 +422,7 @@ In the second sample, $$$|1 - 4|\cdot|1 - 5|\cdot|4 - 5| = 3\cdot 4 \cdot 1 = 12
 
 In the third sample, $$$|1 - 4|\cdot|1 - 9|\cdot|4 - 9| = 3 \cdot 8 \cdot 5 = 120 \equiv 1 \bmod 7$$$.', '[]',
   '24277afe40d88666baaf2c0a2502824a602854929079aa2eaa6561424a844612', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"codeforces_api","rating":"codeforces_api","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"Should''ve thought about piegonhole principle. Modular Arithmetic and pigeonhole principle go hand to hand","Metacognition":null,"Tags":["Resolve","All Pairs","Modular Arithmetic","Pigeonhole Principle"],"Difficulty":"1600"}}', 'notion_showcase_v1',
+  '{"title":"codeforces_api","rating":"codeforces_api","difficulty":"codeforces_rating_band_v1","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"Should''ve thought about piegonhole principle. Modular Arithmetic and pigeonhole principle go hand to hand","Metacognition":null,"Tags":["Resolve","All Pairs","Modular Arithmetic","Pigeonhole Principle"],"Difficulty":"1600"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/4346a2a85c264acda409b34652c6c8e2","selected_because":"Resolve number-theory example where pigeonhole reasoning collapses an apparent all-pairs product.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'resolve', '2026-08-02',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -521,7 +521,7 @@ X#..
 .#.#
 ```', '[]',
   '464c16283d2488fe937b530e2c8513ec0be6c86dbe0f5749371d927d85b2e83d', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"codeforces_api","rating":"codeforces_api","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"The maximum length path can be n * m in a grid of n * m. And from now on let''s try to put all the conditions like !vis[x][y] && a[x][y] =! ''#'' in the isvalid function","Metacognition":null,"Tags":["Revise","BFS"],"Difficulty":"1600"}}', 'notion_showcase_v1',
+  '{"title":"codeforces_api","rating":"codeforces_api","difficulty":"codeforces_rating_band_v1","official_tags":"codeforces_api","statement":"huggingface_snapshot_of_codeforces"}', '{"notion_properties":{"Summary":null,"Gains":"The maximum length path can be n * m in a grid of n * m. And from now on let''s try to put all the conditions like !vis[x][y] && a[x][y] =! ''#'' in the isvalid function","Metacognition":null,"Tags":["Revise","BFS"],"Difficulty":"1600"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/134cb296d7c74853ac4f7d754058a1d2","selected_because":"Revise grid-search example with a concrete implementation lesson about traversal depth and validity checks.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'revise', '2026-07-31',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -566,7 +566,7 @@ INSERT INTO problems (
   'Permutation Warm-Up', 'Codeforces 2108', 'A', '800',
   '["combinatorics","greedy","math"]', 'For a permutation (p) of length (n)(^{\text{∗}}), we define the function: () f(p) = \sum_{i=1}^{n} \lvert p_i - i \rvert () You are given a number (n). You need to compute how many distinct values the function (f(p)) can take when considering all possible permutations of the numbers from (1) to (n). (^{\text{∗}})A permutation of length (n) is an array consisting of (n) distinct integers from (1) to (n) in arbitrary order. For example, (2,3,1,5,4) is a permutation, but (1,2,2) is not a permutation ((2) appears twice in the array), and (1,3,4) is also not a permutation ((n=3) but there is (4) in the array). Each test contains multiple test cases. The first line contains the number of test cases (t) ((1 \le t \le 100)). The description of the test cases follows. The first line of each test case contains an integer (n) ((1 \leq n \leq 500)) — the number of numbers in the permutations. For each test case, output a single integer — the number of distinct values of the function (f(p)) for the given length of permutations. Consider the first two examples of the input. For (n = 2), there are only (2) permutations — (1, 2) and (2, 1). (f(1, 2) = \lvert 1 - 1 \rvert + \lvert 2 - 2 \rvert = 0), (f(2, 1) = \lvert 2 - 1 \rvert + \lvert 1 - 2 \rvert = 1 + 1 = 2). Thus, the function takes (2) distinct values. For (n=3), there are already (6) permutations: (1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1), the function values of which will be (0, 2, 2, 4, 4), and (4) respectively, meaning there are a total of (3) values.', '[]',
   '3994c499be9fc59f8f5154cc25629654939af856abee486ef1cbcd18728c837e', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"codeforces_api","rating":"codeforces_api","official_tags":"codeforces_api","statement":"cf_problemset_mirror_snapshot"}', '{"notion_properties":{"Summary":null,"Gains":"If they''re talking about permutations, do the following - \n1. Think about the first permutation and the last permutation & get answers for both. Those are usually the lower and upper bounds\n2. Given the first permutation, we can reach  any other permutation by doing adjacent swaps where a[i] < a[j] for i < j\n3. Now, calculate the rate of change for any permutation with respect to the initial permutation","Metacognition":null,"Tags":["Resolve","Inversions"],"Difficulty":"800"}}', 'notion_showcase_v1',
+  '{"title":"codeforces_api","rating":"codeforces_api","difficulty":"codeforces_rating_band_v1","official_tags":"codeforces_api","statement":"cf_problemset_mirror_snapshot"}', '{"notion_properties":{"Summary":null,"Gains":"If they''re talking about permutations, do the following - \n1. Think about the first permutation and the last permutation & get answers for both. Those are usually the lower and upper bounds\n2. Given the first permutation, we can reach  any other permutation by doing adjacent swaps where a[i] < a[j] for i < j\n3. Now, calculate the rate of change for any permutation with respect to the initial permutation","Metacognition":null,"Tags":["Resolve","Inversions"],"Difficulty":"800"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/289067fc316a4068ab2c7892e43acce1","selected_because":"Newer easy Resolve example with a useful permutation invariant and an intentionally missing local source.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'resolve', '2026-08-01',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -653,7 +653,7 @@ Output:
 1 2 2 1 2
 ```', '[]',
   '2977d27228f0f64bca6d18648af7a7c66863712e9326e939981b65ec86249b60', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"cses_official","rating":"not_captured","official_tags":"notion_original","statement":"cses_official"}', '{"notion_properties":{"Summary":"Bipartition (UG) + Print → DFS\nOnly col array and c params added\nFor Cycle Detection + Print → DFS\nOnly par array and p params added","Gains":"Using a global flag rather than recursive functional values is better\nBipartite Check and Cycle Detection aren''t the same","Metacognition":null,"Tags":["Bipartite Check","Lesson","Graph Theory"],"Difficulty":"Easy"}}', 'notion_showcase_v1',
+  '{"title":"cses_official","rating":"not_captured","difficulty":"notion_showcase_v1","official_tags":"notion_original","statement":"cses_official"}', '{"notion_properties":{"Summary":"Bipartition (UG) + Print → DFS\nOnly col array and c params added\nFor Cycle Detection + Print → DFS\nOnly par array and p params added","Gains":"Using a global flag rather than recursive functional values is better\nBipartite Check and Cycle Detection aren''t the same","Metacognition":null,"Tags":["Bipartite Check","Lesson","Graph Theory"],"Difficulty":"Easy"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/0d3cbbaaa41f46c1884a9ac22aff6455","selected_because":"CSES platform example with concise implementation notes distinguishing bipartite checking from cycle detection.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'revise', '2026-08-03',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -738,7 +738,7 @@ YES
 LDDRRRRRU
 ```', '[]',
   'f7bcdac7b1b72842cf94eb6e76ab32ef6070ffc0266ae7e077dce66b76174107', '2026-07-30T00:00:00.000Z', 'complete',
-  '{"title":"cses_official","rating":"not_captured","official_tags":"notion_original","statement":"cses_official"}', '{"notion_properties":{"Summary":"SSSP (Grid) + Print → BFS","Gains":"Mark vis[nx][ny] before exploring (nx, ny), otherwise you might get TLE","Metacognition":null,"Tags":["BFS","Graph Theory"],"Difficulty":"Easy"}}', 'notion_showcase_v1',
+  '{"title":"cses_official","rating":"not_captured","difficulty":"notion_showcase_v1","official_tags":"notion_original","statement":"cses_official"}', '{"notion_properties":{"Summary":"SSSP (Grid) + Print → BFS","Gains":"Mark vis[nx][ny] before exploring (nx, ny), otherwise you might get TLE","Metacognition":null,"Tags":["BFS","Graph Theory"],"Difficulty":"Easy"}}', 'notion_showcase_v1',
   '{"notion_row_url":"https://app.notion.com/2a6dd19d238e43a7ab9107f4815fcb47","selected_because":"CSES BFS example with a compact path-reconstruction summary and a concrete TLE prevention lesson.","imported_at":"2026-07-30T00:00:00.000Z","seeded_demo_schedule":true,"learning_field_warning":"Codex-inferred demo fields need user confirmation and are not original wording."}', 'resolve', '2026-08-04',
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(platform, problem_key) DO UPDATE SET
@@ -776,7 +776,7 @@ INSERT INTO saved_views (
   id, name, filter_json, sort_json, visible_columns_json, is_default,
   created_at, updated_at
 ) VALUES (
-  'view-due-today', 'Due today', '{"schema":"resolve.filter.v1","due":"today"}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","reviewStatus","nextReviewDate"]', 1,
+  'view-due-today', 'Due today', '{"schema":"resolve.filter.v1","due":"today"}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","difficulty","reviewStatus","nextReviewDate"]', 1,
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(id) DO UPDATE SET
   name = excluded.name,
@@ -790,7 +790,7 @@ INSERT INTO saved_views (
   id, name, filter_json, sort_json, visible_columns_json, is_default,
   created_at, updated_at
 ) VALUES (
-  'view-retry', 'Retry', '{"schema":"resolve.filter.v1","status":["retry"]}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","reviewStatus","nextReviewDate"]', 0,
+  'view-retry', 'Retry', '{"schema":"resolve.filter.v1","status":["retry"]}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","difficulty","reviewStatus","nextReviewDate"]', 0,
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(id) DO UPDATE SET
   name = excluded.name,
@@ -804,7 +804,7 @@ INSERT INTO saved_views (
   id, name, filter_json, sort_json, visible_columns_json, is_default,
   created_at, updated_at
 ) VALUES (
-  'view-revise', 'Revise', '{"schema":"resolve.filter.v1","status":["revise"]}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","reviewStatus","nextReviewDate"]', 0,
+  'view-revise', 'Revise', '{"schema":"resolve.filter.v1","status":["revise"]}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","difficulty","reviewStatus","nextReviewDate"]', 0,
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(id) DO UPDATE SET
   name = excluded.name,
@@ -818,7 +818,7 @@ INSERT INTO saved_views (
   id, name, filter_json, sort_json, visible_columns_json, is_default,
   created_at, updated_at
 ) VALUES (
-  'view-resolve', 'Resolve', '{"schema":"resolve.filter.v1","status":["resolve"]}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","reviewStatus","nextReviewDate"]', 0,
+  'view-resolve', 'Resolve', '{"schema":"resolve.filter.v1","status":["resolve"]}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","difficulty","reviewStatus","nextReviewDate"]', 0,
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(id) DO UPDATE SET
   name = excluded.name,
@@ -832,7 +832,7 @@ INSERT INTO saved_views (
   id, name, filter_json, sort_json, visible_columns_json, is_default,
   created_at, updated_at
 ) VALUES (
-  'view-all', 'All problems', '{"schema":"resolve.filter.v1"}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","reviewStatus","nextReviewDate"]', 0,
+  'view-all', 'All problems', '{"schema":"resolve.filter.v1"}', '[{"id":"nextReviewDate","desc":false}]', '["title","platform","rating","difficulty","reviewStatus","nextReviewDate"]', 0,
   '2026-07-30T00:00:00.000Z', '2026-07-30T00:00:00.000Z'
 ) ON CONFLICT(id) DO UPDATE SET
   name = excluded.name,

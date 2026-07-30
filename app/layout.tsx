@@ -29,6 +29,13 @@ export async function generateMetadata(): Promise<Metadata> {
     alternates: {
       canonical: identity.productionUrl,
     },
+    icons: {
+      icon: [
+        { url: "/icon-32.png", sizes: "32x32", type: "image/png" },
+        { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      ],
+      apple: [{ url: "/icon-192.png", sizes: "192x192" }],
+    },
     openGraph: {
       title,
       description,

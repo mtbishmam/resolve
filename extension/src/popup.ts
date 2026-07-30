@@ -28,8 +28,21 @@ function captureCodeforcesProblem() {
   }
 
   function blockToMarkdown(node: Element): string {
-    if (node.matches(".tex-span, .tex-font-style-bf, .tex-font-style-it")) {
-      return normalizeMath(text(node));
+    if (
+      node.matches(
+        ".MathJax, .MathJax_Preview, .MJX_Assistive_MathML, .input-output-copier",
+      )
+    ) {
+      return "";
+    }
+    if (
+      node.tagName === "SCRIPT" &&
+      (node as HTMLScriptElement).type.startsWith("math/tex")
+    ) {
+      const source = node.textContent?.trim() ?? "";
+      return (node as HTMLScriptElement).type.includes("mode=display")
+        ? `\n\n$$\n${source}\n$$\n\n`
+        : `$${source}$`;
     }
     if (node.tagName === "IMG") {
       const image = node as HTMLImageElement;
@@ -40,7 +53,10 @@ function captureCodeforcesProblem() {
     }
     if (node.tagName === "BR") return "\n";
     if (node.tagName === "PRE") {
-      return `\n\n\`\`\`text\n${text(node)}\n\`\`\`\n\n`;
+      const lines = [...node.children].length
+        ? [...node.children].map((line) => line.textContent ?? "").join("\n")
+        : (node.textContent ?? "");
+      return `\n\n\`\`\`text\n${lines.trimEnd()}\n\`\`\`\n\n`;
     }
     if (/^H[1-6]$/.test(node.tagName)) {
       return `\n\n## ${normalizeMath(text(node))}\n\n`;
@@ -54,6 +70,13 @@ function captureCodeforcesProblem() {
         )
         .join("")
         .trim()}\n`;
+    }
+    if (
+      node.matches(
+        ".sample-test > .input > .title, .sample-test > .output > .title",
+      )
+    ) {
+      return `\n\n## ${node.closest(".input") ? "Input" : "Output"}\n\n`;
     }
     const inner = [...node.childNodes]
       .map((child) =>
@@ -71,19 +94,13 @@ function captureCodeforcesProblem() {
   const statement = document.querySelector(".problem-statement");
   if (!statement) throw new Error("Codeforces statement was not found.");
   const clone = statement.cloneNode(true) as HTMLElement;
-  clone
-    .querySelectorAll(
-      ".header, .sample-test .title, .input-specification .section-title, .output-specification .section-title",
-    )
-    .forEach((node) => {
-      if (node.matches(".section-title")) {
-        node.replaceWith(
-          Object.assign(document.createElement("h2"), {
-            textContent: text(node),
-          }),
-        );
-      }
-    });
+  clone.querySelectorAll(".section-title").forEach((node) => {
+    node.replaceWith(
+      Object.assign(document.createElement("h2"), {
+        textContent: text(node),
+      }),
+    );
+  });
   const titleRaw = text(statement.querySelector(".title"));
   const title = titleRaw.replace(/^[A-Za-z0-9]+\.\s*/, "").trim();
   const ratingText = text(
@@ -123,7 +140,7 @@ function captureCodeforcesProblem() {
     statement: { format: "markdown", text: markdown, assets },
     provenance: {
       adapter: "codeforces",
-      adapter_version: "1",
+      adapter_version: "2",
       language: document.documentElement.lang || "en",
     },
   };

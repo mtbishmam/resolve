@@ -1,5 +1,14 @@
 # ReSolve
 
+The hosted app is cloud-synced through its private Cloudflare D1 database. The
+problem index is cached in IndexedDB for instant startup, then refreshed from D1
+in the background; writes require a network connection.
+
+Workflow is split into nullable **State** (`Retry`, `Revise`, `Resolve`) and
+**Status** (`Backlog`, `Attempting`, `Pending AC`, `Accepted`). Archiving
+preserves both. Due Today is the default view, and August 2026 is the CP31 Sheet
+sprint for existing 1600–1900 problems.
+
 ReSolve is a private, speed-first competitive-programming reflection and
 active-recall system.
 

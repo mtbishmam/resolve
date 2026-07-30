@@ -7,6 +7,8 @@ type ShowcaseRecord = {
     platform: string;
     title: string;
     problemKey: string;
+    rating: number | null;
+    difficulty: "easy" | "medium" | "hard" | "extreme";
     statementMarkdown: string;
     reviewStatus: string;
     importProvenance: { learning_field_warning: string };
@@ -51,6 +53,25 @@ describe("showcase import", () => {
         (record) => record.reflection.sourceStatus === "missing",
       ),
     ).toHaveLength(1);
+  });
+
+  it("backfills difficulty only for the approved demo records", () => {
+    for (const { problem } of showcase.records) {
+      expect(["easy", "medium", "hard", "extreme"]).toContain(
+        problem.difficulty,
+      );
+      if (problem.rating !== null) {
+        const expected =
+          problem.rating < 1600
+            ? "easy"
+            : problem.rating < 2400
+              ? "medium"
+              : problem.rating < 3000
+                ? "hard"
+                : "extreme";
+        expect(problem.difficulty).toBe(expected);
+      }
+    }
   });
 
   it("marks inferred fields and never fabricates review history", () => {

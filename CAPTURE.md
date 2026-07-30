@@ -1,5 +1,11 @@
 # Capture contract
 
+Adapter v2 reads MathJax source `<script type="math/tex">` nodes and ignores the
+rendered MathJax and assistive MathML copies. This prevents duplicated
+Unicode/plain-text/TeX. Sample input/output child lines are joined with explicit
+newlines before fenced text blocks. The schema stays `resolve.capture.v1` and
+`provenance.adapter_version` is `2`.
+
 ## Extension responsibility
 
 The first extension supports Codeforces. It performs user-triggered,

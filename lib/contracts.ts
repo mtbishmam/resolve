@@ -1,6 +1,16 @@
 import { z } from "zod";
+import { DIFFICULTIES, type Difficulty } from "@/lib/difficulty";
+import {
+  PROBLEM_STATES,
+  PROBLEM_STATUSES,
+  type ProblemState,
+  type ProblemStatus,
+} from "@/lib/workflow";
 
 export const PlatformSchema = z.enum(["codeforces", "cses"]);
+export const DifficultySchema = z.enum(DIFFICULTIES);
+export const ProblemStateSchema = z.enum(PROBLEM_STATES);
+export const ProblemStatusSchema = z.enum(PROBLEM_STATUSES);
 export const ReviewOutcomeSchema = z.enum([
   "recalled",
   "needed_cue",
@@ -31,7 +41,7 @@ export const CaptureSchema = z.object({
     contest_id: z.number().int().positive(),
     index: z.string().min(1).max(4),
     title: z.string().min(1),
-    rating: z.number().int().positive().nullable().optional(),
+    rating: z.number().int().positive().max(3500).nullable().optional(),
     official_tags: z.array(z.string()).default([]),
   }),
   statement: z.object({
@@ -60,16 +70,16 @@ export const StructuredSummarySchema = z.object({
   provenance: z.record(z.string(), z.string()).default({}),
 });
 
-export const SaveReflectionSchema = z.object({
-  idempotency_key: z.string().min(8).max(200),
-  problem: z.object({
+const SaveProblemSchema = z
+  .object({
     platform: PlatformSchema,
     problem_key: z.string().min(1),
     url: z.string().url(),
     title: z.string().min(1),
     contest: z.string().nullable().optional(),
     problem_index: z.string().nullable().optional(),
-    rating: z.number().int().positive().nullable().optional(),
+    rating: z.number().int().positive().max(3500).nullable().optional(),
+    difficulty: DifficultySchema.nullable().optional(),
     official_tags: z.array(z.string()).default([]),
     statement_markdown: z.string().default(""),
     statement_assets: z
@@ -77,7 +87,24 @@ export const SaveReflectionSchema = z.object({
       .default([]),
     metadata_status: z.string().default("complete"),
     metadata_provenance: z.record(z.string(), z.string()).default({}),
-  }),
+    state: ProblemStateSchema.nullable().optional(),
+    status: ProblemStatusSchema.optional().default("backlog"),
+    due_date: z.string().date().nullable().optional(),
+    sprint_id: z.string().nullable().optional(),
+  })
+  .superRefine((problem, context) => {
+    if (problem.rating == null && problem.difficulty == null) {
+      context.addIssue({
+        code: "custom",
+        path: ["difficulty"],
+        message: "Difficulty is required when a problem has no numeric rating",
+      });
+    }
+  });
+
+export const SaveReflectionSchema = z.object({
+  idempotency_key: z.string().min(8).max(200),
+  problem: SaveProblemSchema,
   reflection: z.object({
     source_path: z.string().nullable().optional(),
     source_snapshot: z.string().nullable().optional(),
@@ -101,7 +128,18 @@ export const RecordReviewSchema = z.object({
   recall_note: z.string().max(4000).default(""),
   next_review_date: z.string().date().optional(),
   previous_interval_days: z.number().int().nonnegative().nullable().optional(),
+  timer_limit_seconds: z.number().int().positive().optional(),
+  timer_elapsed_seconds: z.number().int().nonnegative().optional(),
 });
+
+export const UpdateReflectionSchema = z
+  .object({
+    summaryMarkdown: z.string().optional(),
+    structuredSummary: StructuredSummarySchema.optional(),
+    memoryCue: z.string().optional(),
+    confidence: z.number().min(0).max(5).nullable().optional(),
+  })
+  .strict();
 
 export type SaveReflectionInput = z.infer<typeof SaveReflectionSchema>;
 export type RecordReviewInput = z.infer<typeof RecordReviewSchema>;
@@ -114,8 +152,14 @@ export type ProblemListItem = {
   contest: string | null;
   problemIndex: string | null;
   rating: number | null;
-  reviewStatus: string;
+  difficulty: Difficulty | null;
+  state: ProblemState | null;
+  status: ProblemStatus | null;
+  archivedAt: string | null;
+  dueDate: string | null;
+  sprintId: string | null;
   nextReviewDate: string | null;
+  officialTags: string[];
   sourceStatus: string | null;
   updatedAt: string;
 };
@@ -156,5 +200,7 @@ export type ProblemDetail = ProblemListItem & {
     recallNote: string | null;
     nextReviewDate: string | null;
     scheduleVersion: string;
+    timerLimitSeconds: number | null;
+    timerElapsedSeconds: number | null;
   }>;
 };

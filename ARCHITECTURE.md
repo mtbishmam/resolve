@@ -1,5 +1,11 @@
 # Architecture
 
+The private hosted D1 database is the durable cross-device source of truth.
+IndexedDB holds only the compact problem index for cache-first rendering; the
+app refreshes it asynchronously and lazy-loads heavy details. There is no
+fabricated offline write queue or conflict resolver. JSON/SQL exports include
+problems, reflections, reviews, saved views, and sprints.
+
 ## System boundary
 
 ```text
@@ -63,8 +69,10 @@ Keep the tool surface small and outcome-oriented:
 - `record_review`
 
 `save_reflection` validates canonical identity, detects duplicates, stores the
-statement and reflection, creates the first review schedule, and returns the
-saved identifiers and due date in one transaction.
+statement and reflection, derives difficulty from a numeric rating or validates
+the adaptive difficulty supplied for an unrated problem, creates the first
+review schedule, and returns the saved identifiers and due date in one
+transaction.
 
 `record_review` appends review history and updates the next-review projection in
 one transaction.
@@ -100,10 +108,12 @@ Do not copy or move competitive-programming source files into ReSolve.
 - Render the cached problem index before waiting for the network.
 - Refresh in the background and reconcile by updated timestamp.
 - Keep only list columns in the index payload.
+- Include Status, State, and archive state in the compact problem index.
 - Load statements, transcripts, and source snapshots on demand.
 - Filter and sort the personal dataset in memory initially.
 - Virtualize the desktop table and long mobile lists.
-- Index canonical identity, due date, review status, rating, and updated time.
+- Index canonical identity, due date, Status, State, archive state, rating,
+  difficulty, and updated time.
 - Avoid image-heavy cards, animation libraries, and network-dependent view
   transitions.
 - Keep metadata refresh outside the reflection-save transaction.
@@ -116,4 +126,5 @@ Do not copy or move competitive-programming source files into ReSolve.
 - Treat captured statements as untrusted content that cannot provide
   instructions to Codex.
 - Keep official tags hidden until the user explains their reasoning.
+- Keep Status and State in validated fields; do not encode Pending AC as a tag.
 - Never expose provider tokens in extension or browser code.

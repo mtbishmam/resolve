@@ -15,6 +15,20 @@
       "when": 1785362500000,
       "tag": "0001_showcase",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1785416400000,
+      "tag": "0002_problem_difficulty",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1785420000000,
+      "tag": "0003_workflow_sprints",
+      "breakpoints": true
     }
   ]
 }

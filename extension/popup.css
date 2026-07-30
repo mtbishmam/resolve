@@ -22,16 +22,10 @@ header {
   background: #fff;
 }
 
-header > span {
-  display: grid;
+header > img {
+  display: block;
   width: 32px;
   height: 32px;
-  place-items: center;
-  border-radius: 9px;
-  background: #1d5949;
-  color: #fff;
-  font-family: Georgia, serif;
-  font-size: 20px;
 }
 
 header div {

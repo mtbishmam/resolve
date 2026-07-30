@@ -13,4 +13,5 @@ execFileSync(resolve(root, "..", "node_modules", ".bin", "tsc"), [
 for (const file of ["manifest.json", "popup.html", "popup.css"]) {
   await cp(resolve(root, file), resolve(dist, file));
 }
+await cp(resolve(root, "icons"), resolve(dist, "icons"), { recursive: true });
 console.log("Built extension/dist.");

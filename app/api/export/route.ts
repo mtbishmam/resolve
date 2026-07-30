@@ -1,5 +1,10 @@
 import { authorizeBrowserRequest } from "@/lib/auth";
-import { getProblemById, listProblems, listSavedViews } from "@/db/queries";
+import {
+  getProblemById,
+  listProblems,
+  listSavedViews,
+  listSprints,
+} from "@/db/queries";
 import { getD1 } from "@/db/index";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +26,7 @@ export async function GET(request: Request) {
           exportedAt: new Date().toISOString(),
           problems: details,
           savedViews: await listSavedViews(),
+          sprints: await listSprints(),
         },
         null,
         2,
@@ -60,7 +66,13 @@ export async function GET(request: Request) {
   }
   if (format === "sql") {
     const d1 = await getD1();
-    const tableNames = ["problems", "reflections", "reviews", "saved_views"];
+    const tableNames = [
+      "problems",
+      "reflections",
+      "reviews",
+      "saved_views",
+      "sprints",
+    ];
     const output: string[] = [
       "-- ReSolve provider-independent data export",
       "BEGIN TRANSACTION;",

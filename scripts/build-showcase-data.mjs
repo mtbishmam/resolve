@@ -5,6 +5,13 @@ import { resolve } from "node:path";
 const root = resolve(import.meta.dirname, "..");
 const practiceRoot = "/Users/mtbishmam/code/competitive-programming/practice";
 
+function difficultyFromRating(rating) {
+  if (rating < 1600) return "easy";
+  if (rating < 2400) return "medium";
+  if (rating < 3000) return "hard";
+  return "extreme";
+}
+
 const selection = [
   {
     id: "cf-1554-b",
@@ -500,6 +507,10 @@ for (const item of selection) {
       contest,
       problemIndex,
       rating,
+      difficulty:
+        rating === null
+          ? item.notes.difficulty.toLowerCase()
+          : difficultyFromRating(rating),
       officialTags,
       statementMarkdown,
       statementAssets: [],
@@ -513,6 +524,10 @@ for (const item of selection) {
           item.platform === "codeforces" ? "codeforces_api" : "cses_official",
         rating:
           item.platform === "codeforces" ? "codeforces_api" : "not_captured",
+        difficulty:
+          item.platform === "codeforces"
+            ? "codeforces_rating_band_v1"
+            : "notion_showcase_v1",
         official_tags:
           item.platform === "codeforces" ? "codeforces_api" : "notion_original",
         statement: statementProvenance,
@@ -579,6 +594,7 @@ const views = [
     "title",
     "platform",
     "rating",
+    "difficulty",
     "reviewStatus",
     "nextReviewDate",
   ],

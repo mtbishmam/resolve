@@ -12,6 +12,7 @@
         "contest": "Codeforces 1554",
         "problemIndex": "B",
         "rating": 1700,
+        "difficulty": "medium",
         "officialTags": ["bitmasks", "brute force", "greedy", "math"],
         "statementMarkdown": "You are given $$$n$$$ integers $$$a_1, a_2, \\ldots, a_n$$$ and an integer $$$k$$$. Find the maximum value of $$$i \\cdot j - k \\cdot (a_i | a_j)$$$ over all pairs $$$(i, j)$$$ of integers with $$$1 \\le i < j \\le n$$$. Here, $$$|$$$ is the bitwise OR operator.\n\n## Input\n\nThe first line contains a single integer $$$t$$$ ($$$1 \\le t \\le 10\\,000$$$)  — the number of test cases.\n\nThe first line of each test case contains two integers $$$n$$$ ($$$2 \\le n \\le 10^5$$$) and $$$k$$$ ($$$1 \\le k \\le \\min(n, 100)$$$).\n\nThe second line of each test case contains $$$n$$$ integers $$$a_1, a_2, \\ldots, a_n$$$ ($$$0 \\le a_i \\le n$$$).\n\nIt is guaranteed that the sum of $$$n$$$ over all test cases doesn't exceed $$$3 \\cdot 10^5$$$.\n\n## Output\n\nFor each test case, print a single integer  — the maximum possible value of $$$i \\cdot j - k \\cdot (a_i | a_j)$$$.\n\n## Examples\n\nInput:\n\n```text\n4\n3 3\n1 1 3\n2 2\n1 2\n4 3\n0 1 2 3\n6 6\n3 2 0 0 5 6\n```\n\nOutput:\n\n```text\n-1\n-4\n3\n12\n```\n\n## Note\n\nLet $$$f(i, j) = i \\cdot j - k \\cdot (a_i | a_j)$$$.\n\nIn the first test case,\n\n- $$$f(1, 2) = 1 \\cdot 2 - k \\cdot (a_1 | a_2) = 2 - 3 \\cdot (1 | 1) = -1$$$.\n- $$$f(1, 3) = 1 \\cdot 3 - k \\cdot (a_1 | a_3) = 3 - 3 \\cdot (1 | 3) = -6$$$.\n- $$$f(2, 3) = 2 \\cdot 3 - k \\cdot (a_2 | a_3) = 6 - 3 \\cdot (1 | 3) = -3$$$.\n\nSo the maximum is $$$f(1, 2) = -1$$$.\n\nIn the fourth test case, the maximum is $$$f(3, 4) = 12$$$.",
         "statementAssets": [],
@@ -21,6 +22,7 @@
         "metadataProvenance": {
           "title": "codeforces_api",
           "rating": "codeforces_api",
+          "difficulty": "codeforces_rating_band_v1",
           "official_tags": "codeforces_api",
           "statement": "huggingface_snapshot_of_codeforces"
         },
@@ -88,6 +90,7 @@
         "contest": "Codeforces 1486",
         "problemIndex": "B",
         "rating": 1500,
+        "difficulty": "easy",
         "officialTags": [
           "binary search",
           "geometry",
@@ -102,6 +105,7 @@
         "metadataProvenance": {
           "title": "codeforces_api",
           "rating": "codeforces_api",
+          "difficulty": "codeforces_rating_band_v1",
           "official_tags": "codeforces_api",
           "statement": "huggingface_snapshot_of_codeforces"
         },
@@ -171,6 +175,7 @@
         "contest": "Codeforces 1702",
         "problemIndex": "E",
         "rating": 1600,
+        "difficulty": "medium",
         "officialTags": ["dfs and similar", "dsu", "graphs"],
         "statementMarkdown": "Polycarp was recently given a set of $$$n$$$ (number $$$n$$$ — even) dominoes. Each domino contains two integers from $$$1$$$ to $$$n$$$.\n\nCan he divide all the dominoes into two sets so that all the numbers on the dominoes of each set are different? Each domino must go into exactly one of the two sets.\n\nFor example, if he has $$$4$$$ dominoes: $$$\\{1, 4\\}$$$, $$$\\{1, 3\\}$$$, $$$\\{3, 2\\}$$$ and $$$\\{4, 2\\}$$$, then Polycarp will be able to divide them into two sets in the required way. The first set can include the first and third dominoes ($$$\\{1, 4\\}$$$ and $$$\\{3, 2\\}$$$), and the second set — the second and fourth ones ($$$\\{1, 3\\}$$$ and $$$\\{4, 2\\}$$$).\n\n## Input\n\nThe first line contains a single integer $$$t$$$ ($$$1 \\le t \\le 10^4$$$) — the number of test cases.\n\nThe descriptions of the test cases follow.\n\nThe first line of each test case contains a single even integer $$$n$$$ ($$$2 \\le n \\le 2 \\cdot 10^5$$$) — the number of dominoes.\n\nThe next $$$n$$$ lines contain pairs of numbers $$$a_i$$$ and $$$b_i$$$ ($$$1 \\le a_i, b_i \\le n$$$) describing the numbers on the $$$i$$$-th domino.\n\nIt is guaranteed that the sum of $$$n$$$ over all test cases does not exceed $$$2 \\cdot 10^5$$$.\n\n## Output\n\nFor each test case print:\n\n- YES, if it is possible to divide $$$n$$$ dominoes into two sets so that the numbers on the dominoes of each set are different;\n- NO if this is not possible.\n\nYou can print YES and NO in any case (for example, the strings yEs, yes, Yes and YES will be recognized as a positive answer).\n\n## Examples\n\nInput:\n\n```text\n6\n4\n1 2\n4 3\n2 1\n3 4\n6\n1 2\n4 5\n1 3\n4 6\n2 3\n5 6\n2\n1 1\n2 2\n2\n1 2\n2 1\n8\n2 1\n1 2\n4 3\n4 3\n5 6\n5 7\n8 6\n7 8\n8\n1 2\n2 1\n4 3\n5 3\n5 4\n6 7\n8 6\n7 8\n```\n\nOutput:\n\n```text\nYES\nNO\nNO\nYES\nYES\nNO\n```\n\n## Note\n\nIn the first test case, the dominoes can be divided as follows:\n\n- First set of dominoes: $$$[\\{1, 2\\}, \\{4, 3\\}]$$$\n- Second set of dominoes: $$$[\\{2, 1\\}, \\{3, 4\\}]$$$\n\nIn the second test case, there's no way to divide dominoes into $$$2$$$ sets, at least one of them will contain repeated number.",
         "statementAssets": [],
@@ -180,6 +185,7 @@
         "metadataProvenance": {
           "title": "codeforces_api",
           "rating": "codeforces_api",
+          "difficulty": "codeforces_rating_band_v1",
           "official_tags": "codeforces_api",
           "statement": "huggingface_snapshot_of_codeforces"
         },
@@ -247,6 +253,7 @@
         "contest": "Codeforces 1305",
         "problemIndex": "C",
         "rating": 1600,
+        "difficulty": "medium",
         "officialTags": [
           "brute force",
           "combinatorics",
@@ -261,6 +268,7 @@
         "metadataProvenance": {
           "title": "codeforces_api",
           "rating": "codeforces_api",
+          "difficulty": "codeforces_rating_band_v1",
           "official_tags": "codeforces_api",
           "statement": "huggingface_snapshot_of_codeforces"
         },
@@ -333,6 +341,7 @@
         "contest": "Codeforces 377",
         "problemIndex": "A",
         "rating": 1600,
+        "difficulty": "medium",
         "officialTags": ["dfs and similar"],
         "statementMarkdown": "Pavel loves grid mazes. A grid maze is an n × m rectangle maze where each cell is either empty, or is a wall. You can go from one cell to another only if both cells are empty and have a common side.\n\nPavel drew a grid maze with all empty cells forming a connected area. That is, you can go from any empty cell to any other one. Pavel doesn't like it when his maze has too little walls. He wants to turn exactly k empty cells into walls so that all the remaining cells still formed a connected area. Help him.\n\n## Input\n\nThe first line contains three integers n, m, k (1 ≤ n, m ≤ 500, 0 ≤ k < s), where n and m are the maze's height and width, correspondingly, k is the number of walls Pavel wants to add and letter s represents the number of empty cells in the original maze.\n\nEach of the next n lines contains m characters. They describe the original maze. If a character on a line equals \".\", then the corresponding cell is empty and if the character equals \"#\", then the cell is a wall.\n\n## Output\n\nPrint n lines containing m characters each: the new maze that fits Pavel's requirements. Mark the empty cells that you transformed into walls as \"X\", the other cells must be left without changes (that is, \".\" and \"#\").\n\nIt is guaranteed that a solution exists. If there are multiple solutions you can output any of them.\n\n## Examples\n\nInput:\n\n```text\n3 4 2\n#..#\n..#.\n#...\n```\n\nOutput:\n\n```text\n#.X#\nX.#.\n#...\n```\n\nInput:\n\n```text\n5 4 5\n#...\n#.#.\n.#..\n...#\n.#.#\n```\n\nOutput:\n\n```text\n#XXX\n#X#.\nX#..\n...#\n.#.#\n```",
         "statementAssets": [],
@@ -342,6 +351,7 @@
         "metadataProvenance": {
           "title": "codeforces_api",
           "rating": "codeforces_api",
+          "difficulty": "codeforces_rating_band_v1",
           "official_tags": "codeforces_api",
           "statement": "huggingface_snapshot_of_codeforces"
         },
@@ -409,6 +419,7 @@
         "contest": "Codeforces 2108",
         "problemIndex": "A",
         "rating": 800,
+        "difficulty": "easy",
         "officialTags": ["combinatorics", "greedy", "math"],
         "statementMarkdown": "For a permutation (p) of length (n)(^{\\text{∗}}), we define the function: () f(p) = \\sum_{i=1}^{n} \\lvert p_i - i \\rvert () You are given a number (n). You need to compute how many distinct values the function (f(p)) can take when considering all possible permutations of the numbers from (1) to (n). (^{\\text{∗}})A permutation of length (n) is an array consisting of (n) distinct integers from (1) to (n) in arbitrary order. For example, (2,3,1,5,4) is a permutation, but (1,2,2) is not a permutation ((2) appears twice in the array), and (1,3,4) is also not a permutation ((n=3) but there is (4) in the array). Each test contains multiple test cases. The first line contains the number of test cases (t) ((1 \\le t \\le 100)). The description of the test cases follows. The first line of each test case contains an integer (n) ((1 \\leq n \\leq 500)) — the number of numbers in the permutations. For each test case, output a single integer — the number of distinct values of the function (f(p)) for the given length of permutations. Consider the first two examples of the input. For (n = 2), there are only (2) permutations — (1, 2) and (2, 1). (f(1, 2) = \\lvert 1 - 1 \\rvert + \\lvert 2 - 2 \\rvert = 0), (f(2, 1) = \\lvert 2 - 1 \\rvert + \\lvert 1 - 2 \\rvert = 1 + 1 = 2). Thus, the function takes (2) distinct values. For (n=3), there are already (6) permutations: (1, 2, 3), (1, 3, 2), (2, 1, 3), (2, 3, 1), (3, 1, 2), (3, 2, 1), the function values of which will be (0, 2, 2, 4, 4), and (4) respectively, meaning there are a total of (3) values.",
         "statementAssets": [],
@@ -418,6 +429,7 @@
         "metadataProvenance": {
           "title": "codeforces_api",
           "rating": "codeforces_api",
+          "difficulty": "codeforces_rating_band_v1",
           "official_tags": "codeforces_api",
           "statement": "cf_problemset_mirror_snapshot"
         },
@@ -485,6 +497,7 @@
         "contest": "CSES Problem Set",
         "problemIndex": "1668",
         "rating": null,
+        "difficulty": "easy",
         "officialTags": ["Bipartite Check", "Graph Theory"],
         "statementMarkdown": "There are $n$ pupils in Uolevi's class, and $m$ friendships between them. Your task is to divide the pupils into two teams in such a way that no two pupils in a team are friends. You can freely choose the sizes of the teams.\n\n## Input\n\nThe first input line has two integers $n$ and $m$: the number of pupils and friendships. The pupils are numbered $1,2,\\dots,n$.\n\nThen, there are $m$ lines describing the friendships. Each line has two integers $a$ and $b$: pupils $a$ and $b$ are friends.\n\nEvery friendship is between two different pupils. You can assume that there is at most one friendship between any two pupils.\n\n## Output\n\nPrint an example of how to build the teams. For each pupil, print \"1\" or \"2\" depending on to which team the pupil will be assigned. You can print any valid team.\n\nIf there are no solutions, print \"IMPOSSIBLE\".\n\n## Constraints\n\n- $1 \\le n \\le 10^5$\n\n- $1 \\le m \\le 2 \\cdot 10^5$\n\n- $1 \\le a,b \\le n$\n\n## Example\n\nInput:\n\n```text\n5 3\n1 2\n1 3\n4 5\n```\n\nOutput:\n\n```text\n1 2 2 1 2\n```",
         "statementAssets": [],
@@ -494,6 +507,7 @@
         "metadataProvenance": {
           "title": "cses_official",
           "rating": "not_captured",
+          "difficulty": "notion_showcase_v1",
           "official_tags": "notion_original",
           "statement": "cses_official"
         },
@@ -561,6 +575,7 @@
         "contest": "CSES Problem Set",
         "problemIndex": "1193",
         "rating": null,
+        "difficulty": "easy",
         "officialTags": ["BFS", "Graph Theory"],
         "statementMarkdown": "You are given a map of a labyrinth, and your task is to find a path from start to end. You can walk left, right, up and down.\n\n## Input\n\nThe first input line has two integers $n$ and $m$: the height and width of the map.\n\nThen there are $n$ lines of $m$ characters describing the labyrinth. Each character is . (floor), # (wall), A (start), or B (end). There is exactly one A and one B in the input.\n\n## Output\n\nFirst print \"YES\", if there is a path, and \"NO\" otherwise.\n\nIf there is a path, print the length of the shortest such path and its description as a string consisting of characters L (left), R (right), U (up), and D (down). You can print any valid solution.\n\n## Constraints\n\n- $1 \\le n,m \\le 1000$\n\n## Example\n\nInput:\n\n```text\n5 8\n########\n#.A#...#\n#.##.#B#\n#......#\n########\n```\n\nOutput:\n\n```text\nYES\n9\nLDDRRRRRU\n```",
         "statementAssets": [],
@@ -570,6 +585,7 @@
         "metadataProvenance": {
           "title": "cses_official",
           "rating": "not_captured",
+          "difficulty": "notion_showcase_v1",
           "official_tags": "notion_original",
           "statement": "cses_official"
         },
@@ -644,6 +660,7 @@
         "title",
         "platform",
         "rating",
+        "difficulty",
         "reviewStatus",
         "nextReviewDate"
       ],
@@ -665,6 +682,7 @@
         "title",
         "platform",
         "rating",
+        "difficulty",
         "reviewStatus",
         "nextReviewDate"
       ],
@@ -686,6 +704,7 @@
         "title",
         "platform",
         "rating",
+        "difficulty",
         "reviewStatus",
         "nextReviewDate"
       ],
@@ -707,6 +726,7 @@
         "title",
         "platform",
         "rating",
+        "difficulty",
         "reviewStatus",
         "nextReviewDate"
       ],
@@ -726,6 +746,7 @@
         "title",
         "platform",
         "rating",
+        "difficulty",
         "reviewStatus",
         "nextReviewDate"
       ],

@@ -3,9 +3,19 @@ import {
   listDueReviews,
   recordReview,
   saveReflection,
+  updateProblemProperties,
+  updateReflection,
 } from "@/db/queries";
 import { getMcpToken } from "@/db/index";
-import { RecordReviewSchema, SaveReflectionSchema } from "@/lib/contracts";
+import {
+  DifficultySchema,
+  ProblemStateSchema,
+  ProblemStatusSchema,
+  RecordReviewSchema,
+  SaveReflectionSchema,
+  UpdateReflectionSchema,
+} from "@/lib/contracts";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
 
@@ -20,13 +30,55 @@ const tools = [
   {
     name: "save_reflection",
     description:
-      "Atomically and idempotently save a canonical problem and exact ordered reflection transcript.",
+      "Atomically and idempotently save a canonical problem and exact ordered reflection transcript. Numeric ratings derive difficulty automatically; unrated problems require an adaptive easy, medium, hard, or extreme difficulty.",
     inputSchema: {
       type: "object",
       required: ["idempotency_key", "problem", "reflection"],
       properties: {
         idempotency_key: { type: "string" },
-        problem: { type: "object" },
+        problem: {
+          type: "object",
+          required: [
+            "platform",
+            "problem_key",
+            "url",
+            "title",
+            "official_tags",
+            "statement_markdown",
+            "statement_assets",
+          ],
+          properties: {
+            platform: { enum: ["codeforces", "cses"] },
+            problem_key: { type: "string" },
+            url: { type: "string", format: "uri" },
+            title: { type: "string" },
+            contest: { type: ["string", "null"] },
+            problem_index: { type: ["string", "null"] },
+            rating: {
+              type: ["integer", "null"],
+              minimum: 1,
+              maximum: 3500,
+            },
+            difficulty: {
+              type: ["string", "null"],
+              enum: ["easy", "medium", "hard", "extreme", null],
+            },
+            official_tags: { type: "array", items: { type: "string" } },
+            statement_markdown: { type: "string" },
+            statement_assets: { type: "array" },
+            metadata_status: { type: "string" },
+            metadata_provenance: { type: "object" },
+            state: {
+              type: ["string", "null"],
+              enum: ["retry", "revise", "resolve", null],
+            },
+            status: {
+              enum: ["backlog", "attempting", "pending_ac", "accepted"],
+            },
+            due_date: { type: ["string", "null"], format: "date" },
+            sprint_id: { type: ["string", "null"] },
+          },
+        },
         reflection: { type: "object" },
       },
     },
@@ -86,10 +138,69 @@ const tools = [
         },
         recall_note: { type: "string" },
         next_review_date: { type: "string", format: "date" },
+        timer_limit_seconds: { type: "integer", minimum: 1 },
+        timer_elapsed_seconds: { type: "integer", minimum: 0 },
+      },
+    },
+  },
+  {
+    name: "update_problem",
+    description:
+      "Edit workflow properties without changing State or Status unless explicitly supplied. Archiving preserves both.",
+    inputSchema: {
+      type: "object",
+      required: ["problem_id"],
+      properties: {
+        problem_id: { type: "string" },
+        rating: { type: ["integer", "null"] },
+        difficulty: {
+          type: ["string", "null"],
+          enum: ["easy", "medium", "hard", "extreme", null],
+        },
+        state: {
+          type: ["string", "null"],
+          enum: ["retry", "revise", "resolve", null],
+        },
+        status: {
+          type: ["string", "null"],
+          enum: ["backlog", "attempting", "pending_ac", "accepted", null],
+        },
+        archived: { type: "boolean" },
+        due_date: { type: ["string", "null"], format: "date" },
+        next_review_date: { type: ["string", "null"], format: "date" },
+        official_tags: { type: "array", items: { type: "string" } },
+      },
+    },
+  },
+  {
+    name: "update_reflection",
+    description:
+      "Edit generated reflection fields. The ordered raw transcript remains immutable.",
+    inputSchema: {
+      type: "object",
+      required: ["reflection_id"],
+      properties: {
+        reflection_id: { type: "string" },
+        summaryMarkdown: { type: "string" },
+        structuredSummary: { type: "object" },
+        memoryCue: { type: "string" },
+        confidence: { type: ["number", "null"], minimum: 0, maximum: 5 },
       },
     },
   },
 ];
+
+const McpProblemUpdateSchema = z.object({
+  problem_id: z.string().min(1),
+  rating: z.number().int().positive().max(3500).nullable().optional(),
+  difficulty: DifficultySchema.nullable().optional(),
+  state: ProblemStateSchema.nullable().optional(),
+  status: ProblemStatusSchema.nullable().optional(),
+  archived: z.boolean().optional(),
+  due_date: z.string().date().nullable().optional(),
+  next_review_date: z.string().date().nullable().optional(),
+  official_tags: z.array(z.string()).optional(),
+});
 
 function rpc(id: RpcRequest["id"], result: unknown) {
   return Response.json({ jsonrpc: "2.0", id: id ?? null, result });
@@ -167,6 +278,29 @@ export async function POST(request: Request) {
         result = await listDueReviews(date);
       } else if (name === "record_review") {
         result = await recordReview(RecordReviewSchema.parse(args));
+      } else if (name === "update_problem") {
+        const input = McpProblemUpdateSchema.parse(args);
+        result = {
+          updated: await updateProblemProperties(input.problem_id, {
+            rating: input.rating,
+            difficulty: input.difficulty,
+            state: input.state,
+            status: input.status,
+            archived: input.archived,
+            dueDate: input.due_date,
+            nextReviewDate: input.next_review_date,
+            officialTags: input.official_tags,
+          }),
+        };
+      } else if (name === "update_reflection") {
+        const { reflection_id, ...fields } = z
+          .object({ reflection_id: z.string().min(1) })
+          .passthrough()
+          .parse(args);
+        const input = UpdateReflectionSchema.parse(fields);
+        result = {
+          updated: await updateReflection(reflection_id, input),
+        };
       } else {
         return rpcError(payload.id, -32602, `Unknown tool: ${name}`);
       }
