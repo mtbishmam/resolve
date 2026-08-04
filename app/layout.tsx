@@ -21,7 +21,7 @@ export async function generateMetadata(): Promise<Metadata> {
   const title = "ReSolve — Competitive programming recall";
   const description =
     "A private, speed-first competitive-programming reflection and active-recall system.";
-  const image = new URL("/og.png", base).toString();
+  const image = new URL("/og-sprint.png", base).toString();
   return {
     metadataBase: base,
     title,

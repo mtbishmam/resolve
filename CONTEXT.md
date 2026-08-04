@@ -40,6 +40,22 @@ Extreme speed is the number-one product requirement.
 12. When due, **Start review** begins progressive active recall and records the
     outcome and next review date.
 
+### Sprint problem flow
+
+1. Open **August Sprint** from the sidebar.
+2. Work through CP31 in rating order: 1600 on August 5–11, 1700 on August
+   12–18, 1800 on August 19–25, and 1900 on August 26–September 1.
+3. Select any problems and create a focused mashup. Choose a five-hour duration
+   and, when needed, a start time earlier than now.
+4. Solve from the stored statement tabs. ReSolve keeps the global and active-tab
+   timers and saves them in the background.
+5. When a Sprint problem is later captured and reflected through Codex,
+   `save_reflection` recognizes its canonical identity, keeps its Sprint due
+   date, adds the reflection, and applies the explicitly supplied State and
+   Status.
+6. If only workflow properties need changing, use `get_problem` and then
+   `update_problem`; no duplicate problem is created.
+
 ## Firm decisions
 
 - The product name is **ReSolve**.

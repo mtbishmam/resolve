@@ -46,6 +46,7 @@ try {
   assert.deepEqual(
     listed.result.tools.map((tool) => tool.name),
     [
+      "list_sprints",
       "save_reflection",
       "get_problem",
       "list_due_reviews",
@@ -191,9 +192,72 @@ try {
   assert.equal(afterUpdate.status, "pending_ac");
   assert.equal(afterUpdate.state, "retry");
   assert.equal(afterUpdate.reflection.memoryCue, "Edited fixture cue");
-  console.log("All six MCP tools passed.");
+  const sprints = await call("list_sprints", {});
+  assert(sprints.some((sprint) => sprint.id === "sprint-2026-08"));
+
+  const sprintProblem = await call("get_problem", {
+    platform: "codeforces",
+    problem_key: "1920:C",
+  });
+  const sprintDueDate = sprintProblem.dueDate;
+  const sprintId = sprintProblem.sprintId;
+  await call("save_reflection", {
+    idempotency_key: "mcp-test-existing-sprint-1920-c",
+    problem: {
+      platform: "codeforces",
+      problem_key: "1920:C",
+      url: sprintProblem.url,
+      title: sprintProblem.title,
+      contest: sprintProblem.contest,
+      problem_index: sprintProblem.problemIndex,
+      rating: sprintProblem.rating,
+      official_tags: sprintProblem.officialTags,
+      statement_markdown: sprintProblem.statementMarkdown,
+      statement_assets: sprintProblem.statementAssets,
+      metadata_status: sprintProblem.metadataStatus,
+      metadata_provenance: sprintProblem.metadataProvenance,
+      state: "revise",
+      status: "accepted",
+    },
+    reflection: {
+      source_path: null,
+      source_snapshot: null,
+      source_status: "missing",
+      transcript_messages: transcript,
+      summary_markdown: "Existing Sprint fixture",
+      structured_summary: {
+        key_insight: "Existing canonical row",
+        wrong_mental_model: "Not captured",
+        why_it_seemed_reasonable: "Not captured",
+        breakthrough_observation: "Identity match",
+        correct_trigger: "Preserve sprint schedule",
+        missing_concepts: [],
+        general_pattern: "Canonical upsert",
+        cognitive_mistakes: [],
+        provenance: {},
+      },
+      memory_cue: "Keep Sprint membership",
+      confidence: 4,
+      first_review_date: "2026-08-06",
+    },
+  });
+  const reflectedSprintProblem = await call("get_problem", {
+    platform: "codeforces",
+    problem_key: "1920:C",
+  });
+  assert.equal(reflectedSprintProblem.sprintId, sprintId);
+  assert.equal(reflectedSprintProblem.dueDate, sprintDueDate);
+  assert.equal(reflectedSprintProblem.status, "accepted");
+  assert.equal(reflectedSprintProblem.state, "revise");
+  console.log("All seven MCP tools passed.");
 } finally {
-  const wrangler = resolve(root, "node_modules", ".bin", "wrangler");
+  const wrangler = resolve(
+    root,
+    "node_modules",
+    "wrangler",
+    "bin",
+    "wrangler.js",
+  );
   execFileSync(
     wrangler,
     [
@@ -206,7 +270,11 @@ try {
       "--persist-to",
       resolve(root, ".wrangler", "state"),
       "--command",
-      "DELETE FROM problems WHERE (platform = 'codeforces' AND problem_key = '9999:A') OR (platform = 'atcoder' AND problem_key = 'abc446_d')",
+      `DELETE FROM problems WHERE (platform = 'codeforces' AND problem_key = '9999:A')
+       OR (platform = 'atcoder' AND problem_key = 'abc446_d');
+       DELETE FROM reflections WHERE idempotency_key = 'mcp-test-existing-sprint-1920-c';
+       UPDATE problems SET state = NULL, status = 'backlog', next_review_date = NULL
+       WHERE platform = 'codeforces' AND problem_key = '1920:C';`,
     ],
     { cwd: root, stdio: "ignore" },
   );
