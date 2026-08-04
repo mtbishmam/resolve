@@ -160,6 +160,7 @@ export const mashups = sqliteTable(
     elapsedByProblemJson: text("elapsed_by_problem_json")
       .notNull()
       .default("{}"),
+    notesByProblemJson: text("notes_by_problem_json").notNull().default("{}"),
     durationSeconds: integer("duration_seconds").notNull(),
     startedAt: text("started_at").notNull(),
     endedAt: text("ended_at"),

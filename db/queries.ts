@@ -3,6 +3,7 @@ import type {
   Mashup,
   ProblemDetail,
   ProblemListItem,
+  RecordMashupResultInput,
   RecordReviewInput,
   SaveReflectionInput,
   UpdateMashupInput,
@@ -618,6 +619,7 @@ function mashupItem(row: Record<string, unknown>): Mashup {
       row.elapsed_by_problem_json,
       {},
     ),
+    notesByProblem: parseJson(row.notes_by_problem_json, {}),
     durationSeconds: Number(row.duration_seconds),
     startedAt: String(row.started_at),
     endedAt: (row.ended_at as string | null) ?? null,
@@ -662,9 +664,9 @@ export async function createMashup(input: CreateMashupInput) {
     .prepare(
       `INSERT INTO mashups (
         id, sprint_id, problem_ids_json, active_problem_id,
-        elapsed_by_problem_json, duration_seconds, started_at, ended_at,
-        status, created_at, updated_at
-      ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, NULL, 'active', ?8, ?8)`,
+        elapsed_by_problem_json, notes_by_problem_json, duration_seconds,
+        started_at, ended_at, status, created_at, updated_at
+      ) VALUES (?1, ?2, ?3, ?4, ?5, '{}', ?6, ?7, NULL, 'active', ?8, ?8)`,
     )
     .bind(
       id,
@@ -709,25 +711,66 @@ export async function updateMashup(id: string, input: UpdateMashupInput) {
           ),
         );
   const status = input.status ?? current.status;
+  const notes =
+    input.notes_by_problem === undefined
+      ? current.notesByProblem
+      : Object.fromEntries(
+          Object.entries(input.notes_by_problem).filter(([problemId]) =>
+            problemIds.has(problemId),
+          ),
+        );
   const now = new Date().toISOString();
   const d1 = await getD1();
   await d1
     .prepare(
       `UPDATE mashups SET active_problem_id = ?1,
-       elapsed_by_problem_json = ?2, status = ?3,
-       ended_at = CASE WHEN ?3 = 'completed' THEN COALESCE(ended_at, ?4)
+       elapsed_by_problem_json = ?2, notes_by_problem_json = ?3, status = ?4,
+       ended_at = CASE WHEN ?4 = 'completed' THEN COALESCE(ended_at, ?5)
                        ELSE NULL END,
-       updated_at = ?4 WHERE id = ?5`,
+       updated_at = ?5 WHERE id = ?6`,
     )
     .bind(
       input.active_problem_id === undefined
         ? current.activeProblemId
         : input.active_problem_id,
       JSON.stringify(elapsed),
+      JSON.stringify(notes),
       status,
       now,
       id,
     )
     .run();
   return getMashup(id);
+}
+
+export async function recordMashupResult(input: RecordMashupResultInput) {
+  const current = await getMashup(input.mashup_id);
+  if (!current) throw new Error("Mashup not found");
+  if (!current.problemIds.includes(input.problem_id)) {
+    throw new Error("The problem is not part of this mashup");
+  }
+  const updated = await updateMashup(input.mashup_id, {
+    notes_by_problem: {
+      ...current.notesByProblem,
+      [input.problem_id]: {
+        approaches: input.approaches,
+        lemmas: input.lemmas,
+        analysis: input.analysis,
+      },
+    },
+  });
+  return {
+    mashup_id: input.mashup_id,
+    problem_id: input.problem_id,
+    updated_at: updated?.updatedAt ?? null,
+  };
+}
+
+export async function deleteMashup(id: string) {
+  const d1 = await getD1();
+  const result = await d1
+    .prepare("DELETE FROM mashups WHERE id = ?1")
+    .bind(id)
+    .run();
+  return Boolean(result.meta.changes);
 }

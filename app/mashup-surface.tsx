@@ -9,7 +9,12 @@ import {
   useRef,
   useState,
 } from "react";
-import type { Mashup, ProblemDetail, ProblemListItem } from "@/lib/contracts";
+import type {
+  Mashup,
+  MashupProblemNotes,
+  ProblemDetail,
+  ProblemListItem,
+} from "@/lib/contracts";
 
 const MarkdownContent = lazy(() => import("./markdown"));
 
@@ -41,6 +46,8 @@ export default function MashupSurface({
   const [details, setDetails] = useState<Record<string, ProblemDetail>>({});
   const [elapsed, setElapsed] = useState(initialMashup.elapsedByProblem);
   const elapsedRef = useRef(initialMashup.elapsedByProblem);
+  const [notes, setNotes] = useState(initialMashup.notesByProblem);
+  const notesRef = useRef(initialMashup.notesByProblem);
   const [now, setNow] = useState(() => Date.now());
   const [saving, setSaving] = useState(false);
   const selected = useMemo(
@@ -63,6 +70,7 @@ export default function MashupSurface({
       patch: Partial<{
         active_problem_id: string | null;
         elapsed_by_problem: Record<string, number>;
+        notes_by_problem: Record<string, MashupProblemNotes>;
         status: "active" | "completed";
       }> = {},
     ) => {
@@ -72,6 +80,7 @@ export default function MashupSurface({
         body: JSON.stringify({
           active_problem_id: activeId,
           elapsed_by_problem: elapsedRef.current,
+          notes_by_problem: notesRef.current,
           ...patch,
         }),
       });
@@ -86,6 +95,10 @@ export default function MashupSurface({
   useEffect(() => {
     elapsedRef.current = elapsed;
   }, [elapsed]);
+
+  useEffect(() => {
+    notesRef.current = notes;
+  }, [notes]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -136,6 +149,25 @@ export default function MashupSurface({
     }
   }
 
+  function updateNote(field: keyof MashupProblemNotes, value: string) {
+    if (!activeId) return;
+    setNotes((current) => ({
+      ...current,
+      [activeId]: {
+        approaches: current[activeId]?.approaches ?? "",
+        lemmas: current[activeId]?.lemmas ?? "",
+        analysis: current[activeId]?.analysis ?? "",
+        [field]: value,
+      },
+    }));
+  }
+
+  const activeNotes = notes[activeId] ?? {
+    approaches: "",
+    lemmas: "",
+    analysis: "",
+  };
+
   return (
     <div className="mashup-overlay">
       <section className="mashup-surface">
@@ -181,29 +213,54 @@ export default function MashupSurface({
         </nav>
 
         <article className="mashup-problem">
-          {activeProblem ? (
-            <div className="mashup-problem-title">
-              <div>
-                <span>
-                  Codeforces · {activeProblem.problemKey} ·{" "}
-                  {activeProblem.rating}
-                </span>
-                <h1>{activeProblem.title}</h1>
+          <div className="mashup-statement">
+            {activeProblem ? (
+              <div className="mashup-problem-title">
+                <div>
+                  <span>
+                    {activeProblem.platform} · {activeProblem.problemKey} ·{" "}
+                    {activeProblem.rating ?? "Unrated"}
+                  </span>
+                  <h1>{activeProblem.title}</h1>
+                </div>
+                <a href={activeDetail?.url} target="_blank" rel="noreferrer">
+                  Open judge ↗
+                </a>
               </div>
-              <a href={activeDetail?.url} target="_blank" rel="noreferrer">
-                Open judge ↗
-              </a>
+            ) : null}
+            {activeDetail ? (
+              <Suspense fallback={<p>Loading statement…</p>}>
+                <MarkdownContent className="markdown-content" statement>
+                  {activeDetail.statementMarkdown}
+                </MarkdownContent>
+              </Suspense>
+            ) : (
+              <p>Loading the stored problem statement…</p>
+            )}
+          </div>
+          <aside className="mashup-notes">
+            <div>
+              <span>Working result</span>
+              <em>Saved automatically</em>
             </div>
-          ) : null}
-          {activeDetail ? (
-            <Suspense fallback={<p>Loading statement…</p>}>
-              <MarkdownContent className="markdown-content">
-                {activeDetail.statementMarkdown}
-              </MarkdownContent>
-            </Suspense>
-          ) : (
-            <p>Loading the stored problem statement…</p>
-          )}
+            {(["approaches", "lemmas", "analysis"] as const).map((field) => (
+              <label key={field}>
+                <span>{field[0].toUpperCase() + field.slice(1)}</span>
+                <textarea
+                  value={activeNotes[field]}
+                  placeholder={
+                    field === "approaches"
+                      ? "Approaches tried or considered…"
+                      : field === "lemmas"
+                        ? "Useful observations and lemmas…"
+                        : "Final complexity and failure analysis…"
+                  }
+                  onChange={(event) => updateNote(field, event.target.value)}
+                  onBlur={() => void persist()}
+                />
+              </label>
+            ))}
+          </aside>
         </article>
       </section>
     </div>

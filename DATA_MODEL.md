@@ -212,6 +212,7 @@ Core fields:
 - `problem_ids_json`
 - `active_problem_id`
 - `elapsed_by_problem_json`
+- `notes_by_problem_json`
 - `duration_seconds`
 - `started_at`
 - `ended_at`
@@ -223,6 +224,10 @@ Problem order is preserved. `started_at` may be earlier than creation time;
 that difference becomes elapsed global time and is initially attributed to the
 first problem. Per-problem elapsed seconds are saved during tab switches,
 periodically, and on exit or completion.
+
+`notes_by_problem_json` is keyed by an existing problem ID and stores three
+strings: `approaches`, `lemmas`, and `analysis`. The MCP write path validates
+membership in `problem_ids_json`; it cannot create a problem row.
 
 ## Dates
 

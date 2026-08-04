@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     requestHeaders.get("x-forwarded-proto") ??
     (host.startsWith("localhost") ? "http" : "https");
   const base = new URL(`${protocol}://${host}`);
-  const title = "ReSolve — Competitive programming recall";
+  const title = "ReSolve";
   const description =
     "A private, speed-first competitive-programming reflection and active-recall system.";
   const image = new URL("/og-sprint.png", base).toString();
@@ -36,6 +36,7 @@ export async function generateMetadata(): Promise<Metadata> {
       ],
       apple: [{ url: "/icon-192.png", sizes: "192x192" }],
     },
+    manifest: "/manifest.webmanifest",
     openGraph: {
       title,
       description,

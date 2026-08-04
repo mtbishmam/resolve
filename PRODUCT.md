@@ -24,12 +24,28 @@ canonical `(platform, problem_key)` is attached to the Sprint and receives its
 due date without losing Status, State, archive history, reviews, reflections,
 or richer stored content.
 
-Problems can be selected from the desktop table or mobile cards to create a
-focused mashup. A mashup shows one stored statement per tab, one global timer,
-and a separate accumulated timer per tab. Its start may be any earlier instant,
+Problems can be selected across any desktop view or mobile card list to create
+a focused mashup. Selection persists while switching views. A mashup shows one
+stored statement per tab, one global timer, a separate accumulated timer per
+tab, and per-problem Approaches, Lemmas, and Analysis fields. Its start may be
+any earlier instant,
 so a session started at 06:00 can be created at 06:11 with eleven minutes
 already elapsed. Timer state is saved periodically and when exiting or
-finishing.
+finishing. Profile → Mashups opens dated result history with copy and delete
+actions.
+
+### Mashup result flow
+
+1. Select problems from one or more views and choose **Create mashup**.
+2. Set a current or earlier start and the global duration. The button shows a
+   creating state until the persisted session opens.
+3. Solve from full-width stored statements; tab time and the three result fields
+   autosave.
+4. Finish or save and exit. Open Profile → Mashups to inspect the complete
+   dated result.
+5. **Copy for ChatGPT** copies the statement, identifiers, Approaches, Lemmas,
+   and Analysis. ChatGPT calls `record_mashup_result` with the existing IDs; it
+   does not create a problem.
 
 ## Product vocabulary
 
