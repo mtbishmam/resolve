@@ -37,19 +37,24 @@ import {
   type ProblemStatus,
 } from "@/lib/workflow";
 import MashupSurface from "./mashup-surface";
+import MashupHistory from "./mashup-history";
 
 const MarkdownContent = lazy(() => import("./markdown"));
 
 function Markdown({
   children,
   className,
+  statement = false,
 }: {
   children: string;
   className?: string;
+  statement?: boolean;
 }) {
   return (
     <Suspense fallback={<div className="markdown-loading">Loading text…</div>}>
-      <MarkdownContent className={className}>{children}</MarkdownContent>
+      <MarkdownContent className={className} statement={statement}>
+        {children}
+      </MarkdownContent>
     </Suspense>
   );
 }
@@ -93,21 +98,14 @@ type Reveal =
 type Outcome = keyof typeof INITIAL_INTERVALS;
 
 const CACHE_KEY = "resolve.problem-index.v2";
+const COLUMN_CACHE_KEY = "resolve.column-visibility.v1";
+const detailCacheKey = (id: string) => `resolve.problem-detail.v1:${id}`;
 const REVEALS: Reveal[] = [
   "none",
   "memory_cue",
   "key_insight",
   "full_reflection",
   "source",
-];
-const DEFAULT_COLUMNS = [
-  "title",
-  "platform",
-  "rating",
-  "difficulty",
-  "state",
-  "status",
-  "dueDate",
 ];
 const columnHelper = createColumnHelper<ProblemListItem>();
 
@@ -241,7 +239,11 @@ export default function ReSolveApp({
   const [mashupStart, setMashupStart] = useState(localDateTimeInput);
   const [mashupHours, setMashupHours] = useState("5");
   const [mashupError, setMashupError] = useState("");
+  const [creatingMashup, setCreatingMashup] = useState(false);
   const [activeMashup, setActiveMashup] = useState<Mashup | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [mashupHistoryOpen, setMashupHistoryOpen] = useState(false);
+  const [offlineProgress, setOfflineProgress] = useState<string | null>(null);
   const [activeViewId, setActiveViewId] = useState("view-due-today");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProblemDetail | null>(null);
@@ -262,12 +264,13 @@ export default function ReSolveApp({
     { id: "dueDate", desc: false },
   ]);
   const [visibility, setVisibility] = useState<VisibilityState>({});
+  const [visibilityReady, setVisibilityReady] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [columnsOpen, setColumnsOpen] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [syncing, setSyncing] = useState(true);
   const [mobileSection, setMobileSection] = useState("today");
-  const [drawerWidth, setDrawerWidth] = useState(510);
+  const [drawerWidth, setDrawerWidth] = useState(720);
   const [fullPage, setFullPage] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const today = todayDhaka();
@@ -311,6 +314,20 @@ export default function ReSolveApp({
   }, [refresh]);
 
   useEffect(() => {
+    void idbGet<VisibilityState>(COLUMN_CACHE_KEY).then((cached) => {
+      if (cached) setVisibility(cached);
+      setVisibilityReady(true);
+    });
+    if ("serviceWorker" in navigator) {
+      void navigator.serviceWorker.register("/sw.js");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (visibilityReady) void idbSet(COLUMN_CACHE_KEY, visibility);
+  }, [visibility, visibilityReady]);
+
+  useEffect(() => {
     function focusSearch(event: KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
@@ -322,16 +339,22 @@ export default function ReSolveApp({
     return () => window.removeEventListener("keydown", focusSearch);
   }, []);
 
+  const selectedRequestRef = useRef<string | null>(null);
   const loadDetail = useCallback(async (id: string) => {
+    selectedRequestRef.current = id;
     setSelectedId(id);
-    setDetailLoading(true);
+    const cached = await idbGet<ProblemDetail>(detailCacheKey(id));
+    if (selectedRequestRef.current !== id) return;
+    if (cached) setDetail(cached);
+    setDetailLoading(!cached);
     try {
       const response = await fetch(`/api/problems/${encodeURIComponent(id)}`);
       if (!response.ok) throw new Error("Problem details unavailable");
       const data = (await response.json()) as { problem: ProblemDetail };
-      setDetail(data.problem);
+      await idbSet(detailCacheKey(id), data.problem);
+      if (selectedRequestRef.current === id) setDetail(data.problem);
     } finally {
-      setDetailLoading(false);
+      if (selectedRequestRef.current === id) setDetailLoading(false);
     }
   }, []);
 
@@ -409,7 +432,6 @@ export default function ReSolveApp({
 
   function selectView(view: SavedView) {
     setActiveSprintId(null);
-    setSelectedProblemIds(new Set());
     setActiveViewId(view.id);
     setSearch(view.filter.search ?? "");
     setStateFilter(view.filter.state ?? []);
@@ -426,15 +448,6 @@ export default function ReSolveApp({
       view.filter.ratingEnd === undefined ? "" : String(view.filter.ratingEnd),
     );
     if (view.sort.length) setSorting(view.sort);
-    setVisibility(
-      Object.fromEntries(
-        DEFAULT_COLUMNS.map((column) => [
-          column,
-          view.visibleColumns.includes(column),
-        ]),
-      ),
-    );
-    setMobileSection(view.id === "view-due-today" ? "today" : "views");
   }
 
   async function saveCurrentView() {
@@ -505,7 +518,14 @@ export default function ReSolveApp({
       }
       const data = (await response.json()) as { problem: ProblemDetail };
       if (detail?.id === id) setDetail(data.problem);
-      await refresh();
+      setProblems((current) => {
+        const next = current.map((problem) =>
+          problem.id === id ? { ...problem, ...data.problem } : problem,
+        );
+        void idbSet(CACHE_KEY, next);
+        return next;
+      });
+      await idbSet(detailCacheKey(id), data.problem);
       return data.problem;
     },
     [detail?.id, refresh],
@@ -671,7 +691,7 @@ export default function ReSolveApp({
   }
 
   async function createMashup() {
-    if (!activeSprint || selectedProblemIds.size === 0) return;
+    if (selectedProblemIds.size === 0 || creatingMashup) return;
     const startedAt = Date.parse(mashupStart);
     const durationSeconds = Math.round(Number(mashupHours) * 3600);
     if (
@@ -686,12 +706,13 @@ export default function ReSolveApp({
       return;
     }
     setMashupError("");
+    setCreatingMashup(true);
     try {
       const response = await fetch("/api/mashups", {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          sprint_id: activeSprint.id,
+          sprint_id: activeSprint?.id ?? null,
           problem_ids: [...selectedProblemIds],
           duration_seconds: durationSeconds,
           started_at: new Date(startedAt).toISOString(),
@@ -703,7 +724,37 @@ export default function ReSolveApp({
       setActiveMashup(data.mashup);
     } catch {
       setMashupError("The mashup could not be saved. Try again.");
+    } finally {
+      setCreatingMashup(false);
     }
+  }
+
+  async function downloadOfflineData() {
+    setProfileOpen(false);
+    let completed = 0;
+    setOfflineProgress(`Downloading 0/${problems.length}`);
+    const queue = [...problems];
+    const workers = Array.from({ length: 6 }, async () => {
+      while (queue.length) {
+        const problem = queue.shift();
+        if (!problem) return;
+        try {
+          const response = await fetch(
+            `/api/problems/${encodeURIComponent(problem.id)}`,
+          );
+          if (response.ok) {
+            const data = (await response.json()) as { problem: ProblemDetail };
+            await idbSet(detailCacheKey(problem.id), data.problem);
+          }
+        } finally {
+          completed += 1;
+          setOfflineProgress(`Downloading ${completed}/${problems.length}`);
+        }
+      }
+    });
+    await Promise.all(workers);
+    setOfflineProgress(`${problems.length} problems available offline`);
+    window.setTimeout(() => setOfflineProgress(null), 3500);
   }
 
   return (
@@ -793,7 +844,6 @@ export default function ReSolveApp({
             className={`sprint-card ${activeSprintId === sprints[0].id ? "active" : ""}`}
             onClick={() => {
               setActiveSprintId(sprints[0].id);
-              setSelectedProblemIds(new Set());
               setSorting([{ id: "dueDate", desc: false }]);
             }}
           >
@@ -848,6 +898,14 @@ export default function ReSolveApp({
       >
         <header className="topbar">
           <div>
+            <Image
+              className="mobile-brand-mark"
+              src="/resolve-logo.png"
+              alt="ReSolve"
+              width={28}
+              height={28}
+              priority
+            />
             <div className="eyebrow">
               {activeSprint ? "Monthly milestone" : "Problem library"}
             </div>
@@ -861,9 +919,33 @@ export default function ReSolveApp({
                   : " in this view"}
             </p>
           </div>
-          <button className="avatar" title={viewer.email}>
-            {viewer.displayName.slice(0, 1).toUpperCase()}
-          </button>
+          <div className="profile-wrap">
+            <button
+              className="avatar"
+              title={viewer.email}
+              aria-expanded={profileOpen}
+              onClick={() => setProfileOpen((value) => !value)}
+            >
+              {viewer.displayName.slice(0, 1).toUpperCase()}
+            </button>
+            {profileOpen ? (
+              <div className="profile-menu">
+                <strong>{viewer.displayName}</strong>
+                <span>{viewer.email}</span>
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    setMashupHistoryOpen(true);
+                  }}
+                >
+                  Mashups
+                </button>
+                <button onClick={() => void downloadOfflineData()}>
+                  Download for offline use
+                </button>
+              </div>
+            ) : null}
+          </div>
         </header>
 
         <div className="toolbar">
@@ -878,18 +960,16 @@ export default function ReSolveApp({
             <kbd>⌘ K</kbd>
           </label>
           <div className="toolbar-actions">
-            {activeSprint ? (
-              <button
-                className="mashup-launch"
-                disabled={selectedProblemIds.size === 0}
-                onClick={() => setMashupBuilderOpen(true)}
-              >
-                Create mashup
-                {selectedProblemIds.size ? (
-                  <b>{selectedProblemIds.size}</b>
-                ) : null}
-              </button>
-            ) : null}
+            <button
+              className="mashup-launch"
+              disabled={selectedProblemIds.size === 0}
+              onClick={() => setMashupBuilderOpen(true)}
+            >
+              Create mashup
+              {selectedProblemIds.size ? (
+                <b>{selectedProblemIds.size}</b>
+              ) : null}
+            </button>
             <button
               className={filtersOpen ? "active" : ""}
               onClick={() => setFiltersOpen((value) => !value)}
@@ -1084,7 +1164,7 @@ export default function ReSolveApp({
           table={table}
           selectedId={selectedId}
           onSelect={loadDetail}
-          selectable={Boolean(activeSprint)}
+          selectable
           selectedProblemIds={selectedProblemIds}
           onSelectedProblemIds={setSelectedProblemIds}
         />
@@ -1094,7 +1174,7 @@ export default function ReSolveApp({
           onReview={(problem) => {
             void loadDetail(problem.id).then(() => setReviewOpen(true));
           }}
-          selectable={Boolean(activeSprint)}
+          selectable
           selectedProblemIds={selectedProblemIds}
           onSelectedProblemIds={setSelectedProblemIds}
         />
@@ -1113,6 +1193,7 @@ export default function ReSolveApp({
 
       {selectedId && !reviewOpen ? (
         <DetailDrawer
+          key={selectedId}
           detail={detail}
           loading={detailLoading}
           onClose={closeDetail}
@@ -1139,7 +1220,7 @@ export default function ReSolveApp({
         />
       ) : null}
 
-      {mashupBuilderOpen && activeSprint ? (
+      {mashupBuilderOpen ? (
         <div className="modal-backdrop">
           <section className="mashup-builder" role="dialog" aria-modal="true">
             <span>Focused contest</span>
@@ -1173,8 +1254,12 @@ export default function ReSolveApp({
               <button onClick={() => setMashupBuilderOpen(false)}>
                 Cancel
               </button>
-              <button className="primary" onClick={() => void createMashup()}>
-                Start mashup
+              <button
+                className="primary"
+                disabled={creatingMashup}
+                onClick={() => void createMashup()}
+              >
+                {creatingMashup ? "Creating…" : "Start mashup"}
               </button>
             </div>
           </section>
@@ -1194,6 +1279,100 @@ export default function ReSolveApp({
         />
       ) : null}
 
+      {mashupHistoryOpen ? (
+        <MashupHistory
+          problems={problems}
+          onClose={() => setMashupHistoryOpen(false)}
+        />
+      ) : null}
+
+      {offlineProgress ? (
+        <div className="sync-toast" role="status">
+          {offlineProgress}
+        </div>
+      ) : null}
+
+      {mobileSection === "views" ? (
+        <section className="mobile-panel">
+          <div className="mobile-panel-title">
+            <Image src="/resolve-logo.png" alt="" width={30} height={30} />
+            <div>
+              <span>ReSolve</span>
+              <h2>Views</h2>
+            </div>
+          </div>
+          <div className="mobile-panel-list">
+            {views.map((view) => (
+              <button
+                key={view.id}
+                onClick={() => {
+                  selectView(view);
+                  setMobileSection(
+                    view.id === "view-due-today" ? "today" : "problems",
+                  );
+                }}
+              >
+                <span className={`view-dot ${view.id.replace("view-", "")}`} />
+                <strong>{view.name}</strong>
+                <em>
+                  {
+                    problems.filter((problem) =>
+                      matchesSavedView(problem, view.filter, today),
+                    ).length
+                  }
+                </em>
+              </button>
+            ))}
+            {sprints.map((sprint) => (
+              <button
+                key={sprint.id}
+                onClick={() => {
+                  setActiveSprintId(sprint.id);
+                  setMobileSection("problems");
+                }}
+              >
+                <span className="view-dot sprint" />
+                <strong>{sprint.name}</strong>
+                <em>
+                  {
+                    problems.filter((problem) => problem.sprintId === sprint.id)
+                      .length
+                  }
+                </em>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {mobileSection === "settings" ? (
+        <section className="mobile-panel">
+          <div className="mobile-panel-title">
+            <Image src="/resolve-logo.png" alt="" width={30} height={30} />
+            <div>
+              <span>ReSolve</span>
+              <h2>Settings</h2>
+            </div>
+          </div>
+          <div className="mobile-settings">
+            <button onClick={() => setMashupHistoryOpen(true)}>
+              <strong>Mashups</strong>
+              <span>History, notes, copy, and delete</span>
+            </button>
+            <button onClick={() => void downloadOfflineData()}>
+              <strong>Download for offline use</strong>
+              <span>Cache every problem and refresh online</span>
+            </button>
+            <div>
+              <strong>Sync status</strong>
+              <span>
+                {syncing ? "Refreshing…" : `${problems.length} problems cached`}
+              </span>
+            </div>
+          </div>
+        </section>
+      ) : null}
+
       <nav className="mobile-nav" aria-label="Mobile navigation">
         {[
           ["today", "◷", "Today"],
@@ -1208,10 +1387,16 @@ export default function ReSolveApp({
               setMobileSection(id);
               if (id === "today") {
                 const due = views.find((view) => view.id === "view-due-today");
-                if (due) selectView(due);
+                if (due) {
+                  selectView(due);
+                  setMobileSection("today");
+                }
               } else if (id === "problems") {
                 const all = views.find((view) => view.id === "view-all");
-                if (all) selectView(all);
+                if (all) {
+                  selectView(all);
+                  setMobileSection("problems");
+                }
               }
             }}
           >
@@ -1251,44 +1436,46 @@ function ProblemTable({
   });
   return (
     <div className="table-frame">
-      <div className="table-head">
-        {selectable ? (
-          <label className="selection-cell select-all">
-            <input
-              type="checkbox"
-              aria-label="Select all visible sprint problems"
-              checked={
-                rows.length > 0 &&
-                rows.every((row) => selectedProblemIds.has(row.original.id))
-              }
-              onChange={(event) => {
-                const next = new Set(selectedProblemIds);
-                rows.forEach((row) => {
-                  if (event.target.checked) next.add(row.original.id);
-                  else next.delete(row.original.id);
-                });
-                onSelectedProblemIds(next);
-              }}
-            />
-          </label>
-        ) : null}
-        {table.getHeaderGroups().map((headerGroup) =>
-          headerGroup.headers.map((header) => (
-            <button
-              key={header.id}
-              style={{ width: header.getSize() }}
-              onClick={header.column.getToggleSortingHandler()}
-            >
-              {flexRender(header.column.columnDef.header, header.getContext())}
-              {{
-                asc: " ↑",
-                desc: " ↓",
-              }[header.column.getIsSorted() as string] ?? ""}
-            </button>
-          )),
-        )}
-      </div>
       <div className="table-scroll" ref={parentRef}>
+        <div className="table-head">
+          {selectable ? (
+            <label className="selection-cell select-all">
+              <input
+                type="checkbox"
+                aria-label="Select all visible problems"
+                checked={
+                  rows.length > 0 &&
+                  rows.every((row) => selectedProblemIds.has(row.original.id))
+                }
+                onChange={(event) => {
+                  const next = new Set(selectedProblemIds);
+                  rows.forEach((row) => {
+                    if (event.target.checked) next.add(row.original.id);
+                    else next.delete(row.original.id);
+                  });
+                  onSelectedProblemIds(next);
+                }}
+              />
+            </label>
+          ) : null}
+          {table.getHeaderGroups().map((headerGroup) =>
+            headerGroup.headers.map((header) => (
+              <button
+                key={header.id}
+                style={{ width: header.getSize() }}
+                onClick={header.column.getToggleSortingHandler()}
+              >
+                {flexRender(
+                  header.column.columnDef.header,
+                  header.getContext(),
+                )}
+                {{ asc: " ↑", desc: " ↓" }[
+                  header.column.getIsSorted() as string
+                ] ?? ""}
+              </button>
+            )),
+          )}
+        </div>
         <div
           className="virtual-body"
           style={{ height: virtualizer.getTotalSize() }}
@@ -1305,7 +1492,15 @@ function ProblemTable({
                   height: virtualRow.size,
                   transform: `translateY(${virtualRow.start}px)`,
                 }}
-                onDoubleClick={() => void onSelect(row.original.id)}
+                onClick={(event) => {
+                  if (
+                    (event.target as HTMLElement).closest(
+                      "button, input, select, textarea, a, label",
+                    )
+                  )
+                    return;
+                  void onSelect(row.original.id);
+                }}
               >
                 {selectable ? (
                   <label
@@ -1452,7 +1647,7 @@ function DetailDrawer({
   fullPage: boolean;
   onFullPage: (value: boolean) => void;
 }) {
-  const [tab, setTab] = useState("overview");
+  const [tab, setTab] = useState("statement");
   const [showTags, setShowTags] = useState(false);
   function startResize(event: React.PointerEvent) {
     event.preventDefault();
@@ -1726,7 +1921,7 @@ function DetailDrawer({
                 Source ↗
               </a>
             </div>
-            <Markdown>{detail.statementMarkdown}</Markdown>
+            <Markdown statement>{detail.statementMarkdown}</Markdown>
           </section>
         ) : null}
         {tab === "reflection" ? (
@@ -2116,7 +2311,7 @@ function ReviewSurface({
               Reconstruct the approach, critical observation, and recognition
               trigger before revealing anything.
             </p>
-            <Markdown>{problem.statementMarkdown}</Markdown>
+            <Markdown statement>{problem.statementMarkdown}</Markdown>
           </article>
           <aside className="recall-panel">
             <label>

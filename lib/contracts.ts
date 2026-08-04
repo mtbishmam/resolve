@@ -154,9 +154,27 @@ export const UpdateMashupSchema = z
     elapsed_by_problem: z
       .record(z.string(), z.number().int().nonnegative())
       .optional(),
+    notes_by_problem: z
+      .record(
+        z.string(),
+        z.object({
+          approaches: z.string().max(50_000).default(""),
+          lemmas: z.string().max(50_000).default(""),
+          analysis: z.string().max(50_000).default(""),
+        }),
+      )
+      .optional(),
     status: z.enum(["active", "completed"]).optional(),
   })
   .strict();
+
+export const RecordMashupResultSchema = z.object({
+  mashup_id: z.string().min(1),
+  problem_id: z.string().min(1),
+  approaches: z.string().max(50_000).default(""),
+  lemmas: z.string().max(50_000).default(""),
+  analysis: z.string().max(50_000).default(""),
+});
 
 export const UpdateReflectionSchema = z
   .object({
@@ -171,6 +189,13 @@ export type SaveReflectionInput = z.infer<typeof SaveReflectionSchema>;
 export type RecordReviewInput = z.infer<typeof RecordReviewSchema>;
 export type CreateMashupInput = z.infer<typeof CreateMashupSchema>;
 export type UpdateMashupInput = z.infer<typeof UpdateMashupSchema>;
+export type RecordMashupResultInput = z.infer<typeof RecordMashupResultSchema>;
+
+export type MashupProblemNotes = {
+  approaches: string;
+  lemmas: string;
+  analysis: string;
+};
 
 export type Mashup = {
   id: string;
@@ -178,6 +203,7 @@ export type Mashup = {
   problemIds: string[];
   activeProblemId: string | null;
   elapsedByProblem: Record<string, number>;
+  notesByProblem: Record<string, MashupProblemNotes>;
   durationSeconds: number;
   startedAt: string;
   endedAt: string | null;

@@ -51,6 +51,7 @@ try {
       "get_problem",
       "list_due_reviews",
       "record_review",
+      "record_mashup_result",
       "update_problem",
       "update_reflection",
     ],
@@ -220,7 +221,7 @@ try {
   assert.equal(reflectedSprintProblem.dueDate, sprintDueDate);
   assert.equal(reflectedSprintProblem.status, "accepted");
   assert.equal(reflectedSprintProblem.state, "revise");
-  console.log("All seven MCP tools passed.");
+  console.log("All eight MCP tools passed.");
 } finally {
   const wrangler = resolve(
     root,

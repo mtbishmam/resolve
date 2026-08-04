@@ -67,6 +67,7 @@ Keep the tool surface small and outcome-oriented:
 - `get_problem`
 - `list_due_reviews`
 - `record_review`
+- `record_mashup_result`
 - `update_problem`
 - `update_reflection`
 - `list_sprints`
@@ -79,6 +80,11 @@ transaction.
 
 `record_review` appends review history and updates the next-review projection in
 one transaction.
+
+`record_mashup_result` verifies that `problem_id` is already in the indicated
+`mashup_id`, then updates only that mashup's notes JSON. It never upserts a
+problem and is the correct tool for a ChatGPT conversation started from a
+copied mashup packet.
 
 `list_sprints` lets the model discover stable Sprint IDs. `get_problem`
 followed by `update_problem` is the MCP path for attaching a problem that is

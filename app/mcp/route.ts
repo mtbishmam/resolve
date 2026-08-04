@@ -2,6 +2,7 @@ import {
   getProblemByIdentity,
   listDueReviews,
   listSprints,
+  recordMashupResult,
   recordReview,
   saveReflection,
   updateProblemProperties,
@@ -13,6 +14,7 @@ import {
   ProblemStateSchema,
   ProblemStatusSchema,
   RecordReviewSchema,
+  RecordMashupResultSchema,
   SaveReflectionSchema,
   UpdateReflectionSchema,
 } from "@/lib/contracts";
@@ -155,6 +157,23 @@ const tools = [
     annotations: { destructiveHint: false, idempotentHint: true },
   },
   {
+    name: "record_mashup_result",
+    description:
+      "Write approaches, lemmas, and analysis for a problem already included in an existing mashup. This verifies membership and never creates or duplicates a problem row.",
+    inputSchema: {
+      type: "object",
+      required: ["mashup_id", "problem_id"],
+      properties: {
+        mashup_id: { type: "string" },
+        problem_id: { type: "string" },
+        approaches: { type: "string" },
+        lemmas: { type: "string" },
+        analysis: { type: "string" },
+      },
+    },
+    annotations: { destructiveHint: false, idempotentHint: true },
+  },
+  {
     name: "update_problem",
     description:
       "Edit workflow properties without changing State or Status unless explicitly supplied. Archiving preserves both.",
@@ -258,7 +277,7 @@ export async function POST(request: Request) {
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "resolve", version: "0.1.0" },
         instructions:
-          "ReSolve is a private competitive-programming learning system. Use canonical (platform, problem_key) identity. For a problem already present in a sprint, get it first; saving a reflection preserves sprint_id and due_date while applying explicit State and Status. Retry is an unsolved reattempt, Revise is a speed re-solve, and Resolve is uncertain reconstruction. Never claim a write succeeded unless the tool result confirms it.",
+          "ReSolve is a private competitive-programming learning system. Use canonical (platform, problem_key) identity. For a problem already present in a sprint, get it first; saving a reflection updates that canonical row and preserves sprint_id and due_date. For mashup approaches, lemmas, and analysis, call record_mashup_result with the existing mashup_id and problem_id; it never creates a problem. Retry is an unsolved reattempt, Revise is a speed re-solve, and Resolve is uncertain reconstruction. Never claim a write succeeded unless the tool result confirms it.",
       });
     }
     if (payload.method === "notifications/initialized") {
@@ -289,6 +308,8 @@ export async function POST(request: Request) {
         result = await listSprints();
       } else if (name === "record_review") {
         result = await recordReview(RecordReviewSchema.parse(args));
+      } else if (name === "record_mashup_result") {
+        result = await recordMashupResult(RecordMashupResultSchema.parse(args));
       } else if (name === "update_problem") {
         const input = McpProblemUpdateSchema.parse(args);
         result = {

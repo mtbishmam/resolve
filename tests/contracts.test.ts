@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   CaptureSchema,
   CreateMashupSchema,
+  RecordMashupResultSchema,
   RecordReviewSchema,
   SaveReflectionSchema,
   TranscriptMessageSchema,
@@ -187,6 +188,17 @@ describe("mashup contract", () => {
     });
     expect(parsed.problem_ids).toHaveLength(2);
     expect(parsed.duration_seconds).toBe(18_000);
+  });
+
+  it("accepts notes for an existing mashup problem", () => {
+    const parsed = RecordMashupResultSchema.parse({
+      mashup_id: "mashup-a",
+      problem_id: "problem-a",
+      approaches: "Binary search on the answer",
+      lemmas: "Feasibility is monotone",
+      analysis: "O(n log n)",
+    });
+    expect(parsed.problem_id).toBe("problem-a");
   });
 });
 
