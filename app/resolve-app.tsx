@@ -449,7 +449,14 @@ export default function ReSolveApp({
     setRatingEnd(
       view.filter.ratingEnd === undefined ? "" : String(view.filter.ratingEnd),
     );
-    if (view.sort.length) setSorting(view.sort);
+    if (view.sort.length) {
+      setSorting(
+        view.sort.map((sort) => ({
+          ...sort,
+          id: sort.id === "nextReviewDate" ? "dueDate" : sort.id,
+        })),
+      );
+    }
   }
 
   async function saveCurrentView() {
