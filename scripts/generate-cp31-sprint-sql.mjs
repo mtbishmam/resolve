@@ -160,7 +160,8 @@ for (let offset = 0; offset < problemStatements.length; offset += batchSize) {
   const tag = `${migrationNumber}_cp31_batch_${suffix}`;
   batchTags.push(tag);
   const batch = problemStatements.slice(offset, offset + batchSize);
-  if (offset + batchSize >= problemStatements.length) batch.push("PRAGMA optimize;");
+  if (offset + batchSize >= problemStatements.length)
+    batch.push("PRAGMA optimize;");
   await writeFile(
     resolve(root, "drizzle", `${tag}.sql`),
     `${batch.join("\n\n")}\n`,
