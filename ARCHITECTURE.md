@@ -4,7 +4,7 @@ The private hosted D1 database is the durable cross-device source of truth.
 IndexedDB holds only the compact problem index for cache-first rendering; the
 app refreshes it asynchronously and lazy-loads heavy details. There is no
 fabricated offline write queue or conflict resolver. JSON/SQL exports include
-problems, reflections, reviews, saved views, and sprints.
+problems, reflections, reviews, saved views, sprints, and mashups.
 
 ## System boundary
 
@@ -67,6 +67,9 @@ Keep the tool surface small and outcome-oriented:
 - `get_problem`
 - `list_due_reviews`
 - `record_review`
+- `update_problem`
+- `update_reflection`
+- `list_sprints`
 
 `save_reflection` validates canonical identity, detects duplicates, stores the
 statement and reflection, derives difficulty from a numeric rating or validates
@@ -76,6 +79,18 @@ transaction.
 
 `record_review` appends review history and updates the next-review projection in
 one transaction.
+
+`list_sprints` lets the model discover stable Sprint IDs. `get_problem`
+followed by `update_problem` is the MCP path for attaching a problem that is
+already in the library. `save_reflection` handles the more common case: when
+canonical identity already exists, it adds the new reflection and applies the
+explicit State and Status while preserving Sprint membership and due date.
+
+The server advertises workflow instructions and read/write annotations during
+MCP initialization. Local Codex clients may use the configured bearer token;
+the hosted ChatGPT surface may use its authenticated ChatGPT session. A generic
+third-party ChatGPT MCP connection must use MCP OAuth 2.1 rather than a custom
+API-key field.
 
 MCP writes require authentication. The extension never receives the MCP token
 or database credentials.

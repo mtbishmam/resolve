@@ -21,7 +21,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { ProblemDetail, ProblemListItem } from "@/lib/contracts";
+import type { Mashup, ProblemDetail, ProblemListItem } from "@/lib/contracts";
 import {
   DIFFICULTIES,
   matchesRatingRange,
@@ -31,10 +31,12 @@ import { INITIAL_INTERVALS, addCalendarDays } from "@/lib/schedule";
 import {
   PROBLEM_STATES,
   PROBLEM_STATUSES,
+  STATE_DEFINITIONS,
   reviewTimerMinutes,
   type ProblemState,
   type ProblemStatus,
 } from "@/lib/workflow";
+import MashupSurface from "./mashup-surface";
 
 const MarkdownContent = lazy(() => import("./markdown"));
 
@@ -116,6 +118,25 @@ function todayDhaka() {
     month: "2-digit",
     day: "2-digit",
   }).format(new Date());
+}
+
+function formatTimer(seconds: number) {
+  const value = Math.max(0, Math.floor(seconds));
+  const hours = Math.floor(value / 3600);
+  const minutes = Math.floor((value % 3600) / 60);
+  const remainder = value % 60;
+  return hours
+    ? [hours, minutes, remainder]
+        .map((part) => String(part).padStart(2, "0"))
+        .join(":")
+    : [minutes, remainder]
+        .map((part) => String(part).padStart(2, "0"))
+        .join(":");
+}
+
+function localDateTimeInput(date = new Date()) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function dateLabel(date: string | null) {
@@ -212,6 +233,15 @@ export default function ReSolveApp({
   const [problems, setProblems] = useState<ProblemListItem[]>([]);
   const [views, setViews] = useState<SavedView[]>([]);
   const [sprints, setSprints] = useState<Sprint[]>([]);
+  const [activeSprintId, setActiveSprintId] = useState<string | null>(null);
+  const [selectedProblemIds, setSelectedProblemIds] = useState<Set<string>>(
+    new Set(),
+  );
+  const [mashupBuilderOpen, setMashupBuilderOpen] = useState(false);
+  const [mashupStart, setMashupStart] = useState(localDateTimeInput);
+  const [mashupHours, setMashupHours] = useState("5");
+  const [mashupError, setMashupError] = useState("");
+  const [activeMashup, setActiveMashup] = useState<Mashup | null>(null);
   const [activeViewId, setActiveViewId] = useState("view-due-today");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProblemDetail | null>(null);
@@ -306,16 +336,20 @@ export default function ReSolveApp({
   }, []);
 
   const activeView = views.find((view) => view.id === activeViewId);
+  const activeSprint = sprints.find((sprint) => sprint.id === activeSprintId);
   const filteredProblems = useMemo(() => {
     const query = search.trim().toLowerCase();
     return problems.filter((problem) => {
       const dueMatch =
+        activeSprintId !== null ||
         activeView?.filter.due !== "today" ||
         ((problem.dueDate ?? problem.nextReviewDate) !== null &&
           (problem.dueDate ?? problem.nextReviewDate)! <= today);
-      const viewMatch = !activeView
-        ? problem.archivedAt === null
-        : matchesSavedView(problem, activeView.filter, today);
+      const viewMatch = activeSprintId
+        ? problem.sprintId === activeSprintId
+        : !activeView
+          ? problem.archivedAt === null
+          : matchesSavedView(problem, activeView.filter, today);
       const stateMatch =
         !stateFilter.length ||
         (problem.state !== null && stateFilter.includes(problem.state));
@@ -360,6 +394,7 @@ export default function ReSolveApp({
     });
   }, [
     activeView,
+    activeSprintId,
     difficultyFilter,
     platformFilter,
     problems,
@@ -373,6 +408,8 @@ export default function ReSolveApp({
   ]);
 
   function selectView(view: SavedView) {
+    setActiveSprintId(null);
+    setSelectedProblemIds(new Set());
     setActiveViewId(view.id);
     setSearch(view.filter.search ?? "");
     setStateFilter(view.filter.state ?? []);
@@ -429,6 +466,51 @@ export default function ReSolveApp({
     if (response.ok) await refresh();
   }
 
+  const updateProblem = useCallback(
+    async (
+      id: string,
+      patch: Partial<{
+        rating: number | null;
+        difficulty: Difficulty | null;
+        state: ProblemState | null;
+        status: ProblemStatus | null;
+        archived: boolean;
+        dueDate: string | null;
+        nextReviewDate: string | null;
+        officialTags: string[];
+      }>,
+    ) => {
+      setProblems((current) =>
+        current.map((problem) =>
+          problem.id === id
+            ? {
+                ...problem,
+                ...(patch.state !== undefined ? { state: patch.state } : {}),
+                ...(patch.status !== undefined ? { status: patch.status } : {}),
+                ...(patch.dueDate !== undefined
+                  ? { dueDate: patch.dueDate }
+                  : {}),
+              }
+            : problem,
+        ),
+      );
+      const response = await fetch(`/api/problems/${id}`, {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (!response.ok) {
+        await refresh();
+        throw new Error("Problem update failed");
+      }
+      const data = (await response.json()) as { problem: ProblemDetail };
+      if (detail?.id === id) setDetail(data.problem);
+      await refresh();
+      return data.problem;
+    },
+    [detail?.id, refresh],
+  );
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("title", {
@@ -479,40 +561,78 @@ export default function ReSolveApp({
       columnHelper.accessor("state", {
         header: "State",
         size: 116,
-        cell: ({ getValue }) => (
-          <span className={`status status-${getValue()}`}>
-            {getValue() ? statusLabel(getValue()!) : "—"}
-          </span>
+        cell: ({ getValue, row }) => (
+          <select
+            className={`inline-select status-${getValue() ?? "none"}`}
+            aria-label={`State for ${row.original.title}`}
+            value={getValue() ?? ""}
+            onChange={(event) =>
+              void updateProblem(row.original.id, {
+                state: event.target.value
+                  ? (event.target.value as ProblemState)
+                  : null,
+              })
+            }
+          >
+            <option value="">None</option>
+            {PROBLEM_STATES.map((state) => (
+              <option key={state} value={state}>
+                {statusLabel(state)}
+              </option>
+            ))}
+          </select>
         ),
       }),
       columnHelper.accessor("status", {
         header: "Status",
         size: 118,
-        cell: ({ getValue }) => (
-          <span className={`status workflow-${getValue() ?? "unclassified"}`}>
-            {getValue() ? statusLabel(getValue()!.replace("_", " ")) : "—"}
-          </span>
+        cell: ({ getValue, row }) => (
+          <select
+            className={`inline-select workflow-${getValue() ?? "unclassified"}`}
+            aria-label={`Status for ${row.original.title}`}
+            value={getValue() ?? ""}
+            onChange={(event) =>
+              void updateProblem(row.original.id, {
+                status: event.target.value
+                  ? (event.target.value as ProblemStatus)
+                  : null,
+              })
+            }
+          >
+            <option value="">Unclassified</option>
+            {PROBLEM_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {statusLabel(status.replace("_", " "))}
+              </option>
+            ))}
+          </select>
         ),
       }),
       columnHelper.accessor("dueDate", {
         header: "Due date",
         size: 132,
         sortingFn: "datetime",
-        cell: ({ getValue }) => {
+        cell: ({ getValue, row }) => {
           const value = getValue();
           return (
-            <span
+            <input
               className={
-                value && value <= today ? "due-date overdue" : "due-date"
+                value && value <= today ? "inline-date overdue" : "inline-date"
               }
-            >
-              {dateLabel(value)}
-            </span>
+              aria-label={`Due date for ${row.original.title}`}
+              type="date"
+              value={value ?? ""}
+              onChange={(event) =>
+                void updateProblem(row.original.id, {
+                  dueDate: event.target.value || null,
+                })
+              }
+            />
           );
         },
       }),
     ],
-    [loadDetail, today],
+    [loadDetail, today, updateProblem],
   );
 
   // TanStack Table intentionally exposes mutable instance methods.
@@ -547,15 +667,43 @@ export default function ReSolveApp({
     }>,
   ) {
     if (!detail) return;
-    const response = await fetch(`/api/problems/${detail.id}`, {
-      method: "PATCH",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    if (!response.ok) return;
-    const data = (await response.json()) as { problem: ProblemDetail };
-    setDetail(data.problem);
-    await refresh();
+    await updateProblem(detail.id, patch);
+  }
+
+  async function createMashup() {
+    if (!activeSprint || selectedProblemIds.size === 0) return;
+    const startedAt = Date.parse(mashupStart);
+    const durationSeconds = Math.round(Number(mashupHours) * 3600);
+    if (
+      !Number.isFinite(startedAt) ||
+      startedAt > Date.now() ||
+      durationSeconds < 15 * 60 ||
+      durationSeconds > 24 * 60 * 60
+    ) {
+      setMashupError(
+        "Choose a past start time and a duration from 0.25 to 24 hours.",
+      );
+      return;
+    }
+    setMashupError("");
+    try {
+      const response = await fetch("/api/mashups", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          sprint_id: activeSprint.id,
+          problem_ids: [...selectedProblemIds],
+          duration_seconds: durationSeconds,
+          started_at: new Date(startedAt).toISOString(),
+        }),
+      });
+      if (!response.ok) throw new Error("Mashup creation failed");
+      const data = (await response.json()) as { mashup: Mashup };
+      setMashupBuilderOpen(false);
+      setActiveMashup(data.mashup);
+    } catch {
+      setMashupError("The mashup could not be saved. Try again.");
+    }
   }
 
   return (
@@ -641,7 +789,14 @@ export default function ReSolveApp({
         </button>
         <div className="sidebar-spacer" />
         {sprints[0] ? (
-          <div className="sprint-card">
+          <button
+            className={`sprint-card ${activeSprintId === sprints[0].id ? "active" : ""}`}
+            onClick={() => {
+              setActiveSprintId(sprints[0].id);
+              setSelectedProblemIds(new Set());
+              setSorting([{ id: "dueDate", desc: false }]);
+            }}
+          >
             <span>Current sprint</span>
             <strong>{sprints[0].name}</strong>
             <em>{sprints[0].source ?? "To be decided"}</em>
@@ -660,6 +815,13 @@ export default function ReSolveApp({
               }{" "}
               accepted
             </p>
+          </button>
+        ) : null}
+        {sprints[1] ? (
+          <div className="next-sprint">
+            <span>Next sprint</span>
+            <strong>{sprints[1].name}</strong>
+            <em>{sprints[1].source ?? "To be decided"}</em>
           </div>
         ) : null}
         <div className="storage-card">
@@ -686,13 +848,17 @@ export default function ReSolveApp({
       >
         <header className="topbar">
           <div>
-            <div className="eyebrow">Problem library</div>
-            <h1>{activeView?.name ?? "All problems"}</h1>
+            <div className="eyebrow">
+              {activeSprint ? "Monthly milestone" : "Problem library"}
+            </div>
+            <h1>{activeSprint?.name ?? activeView?.name ?? "All problems"}</h1>
             <p>
               {filteredProblems.length} problems
-              {activeView?.filter.due === "today"
-                ? " ready for active recall"
-                : " in this view"}
+              {activeSprint
+                ? ` · ${activeSprint.source ?? "Source to be decided"} · ${activeSprint.startsOn} to ${activeSprint.endsOn}`
+                : activeView?.filter.due === "today"
+                  ? " ready for active recall"
+                  : " in this view"}
             </p>
           </div>
           <button className="avatar" title={viewer.email}>
@@ -712,6 +878,18 @@ export default function ReSolveApp({
             <kbd>⌘ K</kbd>
           </label>
           <div className="toolbar-actions">
+            {activeSprint ? (
+              <button
+                className="mashup-launch"
+                disabled={selectedProblemIds.size === 0}
+                onClick={() => setMashupBuilderOpen(true)}
+              >
+                Create mashup
+                {selectedProblemIds.size ? (
+                  <b>{selectedProblemIds.size}</b>
+                ) : null}
+              </button>
+            ) : null}
             <button
               className={filtersOpen ? "active" : ""}
               onClick={() => setFiltersOpen((value) => !value)}
@@ -906,6 +1084,9 @@ export default function ReSolveApp({
           table={table}
           selectedId={selectedId}
           onSelect={loadDetail}
+          selectable={Boolean(activeSprint)}
+          selectedProblemIds={selectedProblemIds}
+          onSelectedProblemIds={setSelectedProblemIds}
         />
         <ProblemCards
           problems={table.getRowModel().rows.map((row) => row.original)}
@@ -913,6 +1094,9 @@ export default function ReSolveApp({
           onReview={(problem) => {
             void loadDetail(problem.id).then(() => setReviewOpen(true));
           }}
+          selectable={Boolean(activeSprint)}
+          selectedProblemIds={selectedProblemIds}
+          onSelectedProblemIds={setSelectedProblemIds}
         />
 
         <footer className="table-footer">
@@ -933,7 +1117,6 @@ export default function ReSolveApp({
           loading={detailLoading}
           onClose={closeDetail}
           onReview={() => {
-            void updateDetail({ status: "attempting" });
             setReviewOpen(true);
           }}
           onUpdate={updateDetail}
@@ -951,6 +1134,61 @@ export default function ReSolveApp({
           onComplete={async () => {
             setReviewOpen(false);
             await loadDetail(detail.id);
+            await refresh();
+          }}
+        />
+      ) : null}
+
+      {mashupBuilderOpen && activeSprint ? (
+        <div className="modal-backdrop">
+          <section className="mashup-builder" role="dialog" aria-modal="true">
+            <span>Focused contest</span>
+            <h2>Create a mashup</h2>
+            <p>
+              {selectedProblemIds.size} selected problems. The first problem
+              receives any elapsed time before the chosen start.
+            </p>
+            <label>
+              Start time
+              <input
+                type="datetime-local"
+                max={localDateTimeInput()}
+                value={mashupStart}
+                onChange={(event) => setMashupStart(event.target.value)}
+              />
+            </label>
+            <label>
+              Global timer (hours)
+              <input
+                type="number"
+                min="0.25"
+                max="24"
+                step="0.25"
+                value={mashupHours}
+                onChange={(event) => setMashupHours(event.target.value)}
+              />
+            </label>
+            {mashupError ? <p className="form-error">{mashupError}</p> : null}
+            <div>
+              <button onClick={() => setMashupBuilderOpen(false)}>
+                Cancel
+              </button>
+              <button className="primary" onClick={() => void createMashup()}>
+                Start mashup
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {activeMashup ? (
+        <MashupSurface
+          initialMashup={activeMashup}
+          problems={problems}
+          onClose={() => setActiveMashup(null)}
+          onComplete={async () => {
+            setActiveMashup(null);
+            setSelectedProblemIds(new Set());
             await refresh();
           }}
         />
@@ -990,10 +1228,16 @@ function ProblemTable({
   table,
   selectedId,
   onSelect,
+  selectable,
+  selectedProblemIds,
+  onSelectedProblemIds,
 }: {
   table: ReturnType<typeof useReactTable<ProblemListItem>>;
   selectedId: string | null;
   onSelect: (id: string) => Promise<void>;
+  selectable: boolean;
+  selectedProblemIds: Set<string>;
+  onSelectedProblemIds: (ids: Set<string>) => void;
 }) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rows = table.getRowModel().rows;
@@ -1008,6 +1252,26 @@ function ProblemTable({
   return (
     <div className="table-frame">
       <div className="table-head">
+        {selectable ? (
+          <label className="selection-cell select-all">
+            <input
+              type="checkbox"
+              aria-label="Select all visible sprint problems"
+              checked={
+                rows.length > 0 &&
+                rows.every((row) => selectedProblemIds.has(row.original.id))
+              }
+              onChange={(event) => {
+                const next = new Set(selectedProblemIds);
+                rows.forEach((row) => {
+                  if (event.target.checked) next.add(row.original.id);
+                  else next.delete(row.original.id);
+                });
+                onSelectedProblemIds(next);
+              }}
+            />
+          </label>
+        ) : null}
         {table.getHeaderGroups().map((headerGroup) =>
           headerGroup.headers.map((header) => (
             <button
@@ -1043,6 +1307,24 @@ function ProblemTable({
                 }}
                 onDoubleClick={() => void onSelect(row.original.id)}
               >
+                {selectable ? (
+                  <label
+                    className="selection-cell"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${row.original.title}`}
+                      checked={selectedProblemIds.has(row.original.id)}
+                      onChange={(event) => {
+                        const next = new Set(selectedProblemIds);
+                        if (event.target.checked) next.add(row.original.id);
+                        else next.delete(row.original.id);
+                        onSelectedProblemIds(next);
+                      }}
+                    />
+                  </label>
+                ) : null}
                 {row.getVisibleCells().map((cell) => (
                   <div
                     key={cell.id}
@@ -1065,15 +1347,40 @@ function ProblemCards({
   problems,
   onSelect,
   onReview,
+  selectable,
+  selectedProblemIds,
+  onSelectedProblemIds,
 }: {
   problems: ProblemListItem[];
   onSelect: (id: string) => Promise<void>;
   onReview: (problem: ProblemListItem) => void;
+  selectable: boolean;
+  selectedProblemIds: Set<string>;
+  onSelectedProblemIds: (ids: Set<string>) => void;
 }) {
   return (
     <div className="problem-cards">
       {problems.map((problem) => (
         <article key={problem.id} onClick={() => void onSelect(problem.id)}>
+          {selectable ? (
+            <label
+              className="mobile-problem-select"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <input
+                type="checkbox"
+                checked={selectedProblemIds.has(problem.id)}
+                aria-label={`Select ${problem.title}`}
+                onChange={(event) => {
+                  const next = new Set(selectedProblemIds);
+                  if (event.target.checked) next.add(problem.id);
+                  else next.delete(problem.id);
+                  onSelectedProblemIds(next);
+                }}
+              />
+              Mashup
+            </label>
+          ) : null}
           <div className="card-meta">
             <span className={`platform platform-${problem.platform}`}>
               {platformLabel(problem.platform)}
@@ -1305,6 +1612,11 @@ function DetailDrawer({
                 <span>REVIEW STATE</span>
                 <select
                   value={detail.state ?? ""}
+                  title={
+                    detail.state
+                      ? STATE_DEFINITIONS[detail.state]
+                      : "Choose how this problem should be reviewed"
+                  }
                   onChange={(event) =>
                     void onUpdate({
                       state: event.target.value
@@ -1318,6 +1630,11 @@ function DetailDrawer({
                   <option value="revise">Revise</option>
                   <option value="resolve">Resolve</option>
                 </select>
+                <small>
+                  {detail.state
+                    ? STATE_DEFINITIONS[detail.state]
+                    : "Retry is unsolved, Revise is a speed re-solve, and Resolve is uncertain recall."}
+                </small>
               </label>
               <label className="editable-property">
                 <span>Status</span>
@@ -1715,6 +2032,7 @@ function ReviewSurface({
   const [saving, setSaving] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const reflection = problem.reflection;
+  const hasReflection = Boolean(reflection);
   const deepestIndex = REVEALS.indexOf(deepest);
   const canRevealSource = Boolean(reflection?.sourceSnapshot);
   const timerLimitSeconds =
@@ -1729,7 +2047,7 @@ function ReviewSurface({
   }, []);
 
   function revealNext() {
-    const max = canRevealSource ? 4 : 3;
+    const max = hasReflection ? (canRevealSource ? 4 : 3) : 0;
     const nextIndex = Math.min(deepestIndex + 1, max);
     setDeepest(REVEALS[nextIndex]);
   }
@@ -1740,7 +2058,7 @@ function ReviewSurface({
   }
 
   async function complete() {
-    if (!outcome || !reflection || !nextDate) return;
+    if (!outcome || !nextDate) return;
     setSaving(true);
     try {
       const response = await fetch("/api/reviews", {
@@ -1749,7 +2067,7 @@ function ReviewSurface({
         body: JSON.stringify({
           idempotency_key: `web:${problem.id}:${crypto.randomUUID()}`,
           problem_id: problem.id,
-          reflection_id: reflection.id,
+          reflection_id: reflection?.id ?? null,
           due_date: problem.dueDate ?? problem.nextReviewDate ?? todayDhaka(),
           outcome,
           deepest_reveal: deepest,
@@ -1772,13 +2090,13 @@ function ReviewSurface({
         <header>
           <button onClick={onClose}>← Exit review</button>
           <div className="review-progress">
-            <span>
+            <span
+              className={elapsedSeconds > timerLimitSeconds ? "overtime" : ""}
+            >
               {problem.state ? statusLabel(problem.state) : "Resolve"} ·{" "}
-              {Math.max(
-                0,
-                Math.ceil((timerLimitSeconds - elapsedSeconds) / 60),
-              )}
-              m left
+              {elapsedSeconds > timerLimitSeconds ? "+" : ""}
+              {formatTimer(Math.abs(timerLimitSeconds - elapsedSeconds))}
+              {elapsedSeconds > timerLimitSeconds ? " overtime" : " left"}
             </span>
             <i style={{ width: `${20 + deepestIndex * 16}%` }} />
           </div>
@@ -1831,7 +2149,9 @@ function ReviewSurface({
                 </RevealCard>
               ) : null}
             </div>
-            {!outcome && deepestIndex < (canRevealSource ? 4 : 3) ? (
+            {!outcome &&
+            hasReflection &&
+            deepestIndex < (canRevealSource ? 4 : 3) ? (
               <button className="reveal-button" onClick={revealNext}>
                 Reveal{" "}
                 {

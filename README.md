@@ -9,6 +9,11 @@ Workflow is split into nullable **State** (`Retry`, `Revise`, `Resolve`) and
 preserves both. Due Today is the default view, and August 2026 is the CP31 Sheet
 sprint for existing 1600–1900 problems.
 
+August is seeded from the checked-in CP31 snapshot: 124 canonical problems,
+five per day within each seven-day rating block, starting August 5 and ending
+September 1. Click the Sprint card to edit its rows inline or select problems
+for a persistent focused mashup with global and per-problem timers.
+
 ReSolve is a private, speed-first competitive-programming reflection and
 active-recall system.
 
@@ -79,13 +84,28 @@ server-side `RESOLVE_MCP_TOKEN`; local use accepts
 
 Tools:
 
+- `list_sprints`
 - `save_reflection`
 - `get_problem`
 - `list_due_reviews`
 - `record_review`
+- `update_problem`
+- `update_reflection`
 
 Writes are Zod-validated, batched atomically in D1, and idempotent. Transcript
 messages retain exact ordered roles and content.
+
+If a CP31 problem already exists, the canonical upsert attaches the Sprint and
+due date without replacing its workflow, archive, reviews, reflections, or
+richer content. A later `save_reflection` preserves that Sprint schedule while
+applying the Status and State supplied by the completed reflection.
+
+For ChatGPT developer testing, add the public HTTPS `/api/mcp` endpoint as a
+Streamable HTTP connection and refresh its metadata after deployment. The
+hosted ChatGPT surface can use its authenticated session. Generic remote MCP
+hosting requires MCP OAuth 2.1; ChatGPT does not accept a custom API key in
+place of that flow. The selected GPT model does not change the protocol or data
+rules—the model discovers and calls the same seven tools.
 
 ## Extension
 

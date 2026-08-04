@@ -121,7 +121,7 @@ export const SaveReflectionSchema = z.object({
 export const RecordReviewSchema = z.object({
   idempotency_key: z.string().min(8).max(200),
   problem_id: z.string().min(1),
-  reflection_id: z.string().min(1),
+  reflection_id: z.string().min(1).nullable().optional(),
   due_date: z.string().date(),
   outcome: ReviewOutcomeSchema,
   deepest_reveal: RevealLevelSchema,
@@ -131,6 +131,32 @@ export const RecordReviewSchema = z.object({
   timer_limit_seconds: z.number().int().positive().optional(),
   timer_elapsed_seconds: z.number().int().nonnegative().optional(),
 });
+
+export const CreateMashupSchema = z
+  .object({
+    sprint_id: z.string().min(1).nullable().optional(),
+    problem_ids: z.array(z.string().min(1)).min(1).max(124),
+    duration_seconds: z
+      .number()
+      .int()
+      .positive()
+      .max(24 * 60 * 60),
+    started_at: z.string().datetime(),
+  })
+  .refine((input) => Date.parse(input.started_at) <= Date.now(), {
+    path: ["started_at"],
+    message: "Mashup start time cannot be in the future",
+  });
+
+export const UpdateMashupSchema = z
+  .object({
+    active_problem_id: z.string().min(1).nullable().optional(),
+    elapsed_by_problem: z
+      .record(z.string(), z.number().int().nonnegative())
+      .optional(),
+    status: z.enum(["active", "completed"]).optional(),
+  })
+  .strict();
 
 export const UpdateReflectionSchema = z
   .object({
@@ -143,6 +169,22 @@ export const UpdateReflectionSchema = z
 
 export type SaveReflectionInput = z.infer<typeof SaveReflectionSchema>;
 export type RecordReviewInput = z.infer<typeof RecordReviewSchema>;
+export type CreateMashupInput = z.infer<typeof CreateMashupSchema>;
+export type UpdateMashupInput = z.infer<typeof UpdateMashupSchema>;
+
+export type Mashup = {
+  id: string;
+  sprintId: string | null;
+  problemIds: string[];
+  activeProblemId: string | null;
+  elapsedByProblem: Record<string, number>;
+  durationSeconds: number;
+  startedAt: string;
+  endedAt: string | null;
+  status: "active" | "completed";
+  createdAt: string;
+  updatedAt: string;
+};
 
 export type ProblemListItem = {
   id: string;

@@ -103,8 +103,9 @@ The extension must not contain database credentials, MCP tokens, or AI calls.
 - Never overwrite raw transcripts.
 - Do not import old Notion problem rows until the user explicitly authorizes
   the migration after reviewing a dry-run report.
-- Keep the four-table MVP unless a new table is justified by an immediate,
-  concrete query or integrity requirement.
+- Keep the six-table model. `sprints` answer monthly membership/deadline
+  queries and `mashups` persist active focused-contest timers; add another table
+  only for an immediate, concrete query or integrity requirement.
 - Maintain SQL, JSON, and Markdown export paths.
 
 ## Performance rules

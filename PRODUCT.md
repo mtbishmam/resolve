@@ -6,6 +6,31 @@ without inventing missing problems. August 2026 targets the 1600, 1700, 1800,
 and 1900 CP31 bands at five problems per day, one seven-day block per band;
 September remains to be decided.
 
+### Sprint flow
+
+The current Sprint card opens a dedicated problem view. August contains the
+124 canonical CP31 problems from the 1600, 1700, 1800, and 1900 lists. The
+shifted schedule starts on August 5:
+
+- 1600: August 5–11
+- 1700: August 12–18
+- 1800: August 19–25
+- 1900: August 26–September 1
+
+Each band assigns five problems on each of its first six days and its final
+problem on day seven, leaving four problems of daily capacity as offset. New
+rows begin as Backlog with no State. A row already present under the same
+canonical `(platform, problem_key)` is attached to the Sprint and receives its
+due date without losing Status, State, archive history, reviews, reflections,
+or richer stored content.
+
+Problems can be selected from the desktop table or mobile cards to create a
+focused mashup. A mashup shows one stored statement per tab, one global timer,
+and a separate accumulated timer per tab. Its start may be any earlier instant,
+so a session started at 06:00 can be created at 06:11 with eleven minutes
+already elapsed. Timer state is saved periodically and when exiting or
+finishing.
+
 ## Product vocabulary
 
 - **Capture**: versioned problem data produced by the browser extension.
@@ -125,6 +150,11 @@ untrusted data.
 
 Pressing **Start review** does not reveal the saved answer and does not require
 Codex.
+
+The timer starts when the focused review surface opens. Revise uses 10/20/30/30
+minutes for Easy/Medium/Hard/Extreme. Retry and Resolve use 10/30/60/90.
+Successful unaided Revise archives the problem while preserving Status and
+State; any unsuccessful result is rescheduled.
 
 It begins a progressive retrieval session:
 
