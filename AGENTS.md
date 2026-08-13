@@ -1,5 +1,16 @@
 # ReSolve repository instructions
 
+## Shared ReApp context
+
+Whenever a task mentions any ReApp or asks about how ReSolve relates to ReFocus
+or ReSync, read the canonical AI context at
+[`agents/context/reapps.md`](<../../Library/Mobile Documents/iCloud~md~obsidian/Documents/obsidian/agents/context/reapps.md>).
+It is derived from the current code under `/Users/mtbishmam/code` and contains
+the family vocabulary, exact Site URLs, product boundaries, repository map,
+architecture, data model, and planned-versus-shipped distinctions. This file
+remains authoritative for ReSolve-specific implementation rules; the shared
+note prevents cross-app context from being lost.
+
 ## Product objective
 
 ReSolve is a personal, speed-first competitive-programming learning system.
