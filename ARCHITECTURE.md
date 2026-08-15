@@ -74,6 +74,10 @@ the adaptive difficulty supplied for an unrated problem, creates the first
 review schedule, and returns the saved identifiers and due date in one
 transaction.
 
+Supported MCP problem platforms are Codeforces, CSES, and AtCoder. AtCoder
+identity uses the task slug from `/contests/{contest}/tasks/{task}` as the
+problem key.
+
 `record_review` appends review history and updates the next-review projection in
 one transaction.
 

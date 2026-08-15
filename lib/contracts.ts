@@ -7,7 +7,7 @@ import {
   type ProblemStatus,
 } from "@/lib/workflow";
 
-export const PlatformSchema = z.enum(["codeforces", "cses"]);
+export const PlatformSchema = z.enum(["codeforces", "cses", "atcoder"]);
 export const DifficultySchema = z.enum(DIFFICULTIES);
 export const ProblemStateSchema = z.enum(PROBLEM_STATES);
 export const ProblemStatusSchema = z.enum(PROBLEM_STATUSES);
@@ -146,7 +146,7 @@ export type RecordReviewInput = z.infer<typeof RecordReviewSchema>;
 
 export type ProblemListItem = {
   id: string;
-  platform: "codeforces" | "cses";
+  platform: "codeforces" | "cses" | "atcoder";
   problemKey: string;
   title: string;
   contest: string | null;

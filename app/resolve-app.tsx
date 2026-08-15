@@ -141,7 +141,9 @@ function statusLabel(status: string) {
 }
 
 function platformLabel(platform: string) {
-  return platform === "codeforces" ? "Codeforces" : "CSES";
+  if (platform === "codeforces") return "Codeforces";
+  if (platform === "cses") return "CSES";
+  return "AtCoder";
 }
 
 function DifficultyTag({ difficulty }: { difficulty: Difficulty | null }) {
@@ -849,6 +851,7 @@ export default function ReSolveApp({
                 <option value="all">All</option>
                 <option value="codeforces">Codeforces</option>
                 <option value="cses">CSES</option>
+                <option value="atcoder">AtCoder</option>
               </select>
             </label>
             <label>
@@ -1282,8 +1285,8 @@ function DetailDrawer({
                   disabled={detail.rating !== null}
                   title={
                     detail.rating === null
-                      ? "Adaptive CSES difficulty"
-                      : "Derived from the Codeforces rating"
+                      ? "Adaptive difficulty"
+                      : "Derived from the problem rating"
                   }
                   onChange={(event) =>
                     void onUpdate({

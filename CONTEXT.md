@@ -30,8 +30,8 @@ Extreme speed is the number-one product requirement.
 7. Codex conducts an adaptive reflection without revealing official tags until
    the user has explained their reasoning.
 8. Codex preserves the exact interview messages and generates a compact,
-   structured reflection. It derives Codeforces difficulty from rating or
-   adaptively assigns difficulty to an unrated CSES problem after hearing the
+   structured reflection. It derives difficulty from a numeric problem rating
+   or adaptively assigns difficulty to an unrated problem after hearing the
    user's reasoning.
 9. When the user says `push_problem`, Codex invokes one atomic, idempotent
    `save_reflection` MCP tool.

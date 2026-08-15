@@ -21,6 +21,11 @@ describe("canonical problem identity", () => {
       "1554:B",
     ],
     ["https://cses.fi/problemset/task/1668/", "cses", "1668"],
+    [
+      "https://atcoder.jp/contests/abc446/tasks/abc446_d?lang=en",
+      "atcoder",
+      "abc446_d",
+    ],
   ])("normalizes %s", (url, platform, problemKey) => {
     expect(normalizeProblemUrl(url)).toMatchObject({ platform, problemKey });
   });
@@ -46,6 +51,13 @@ describe("canonical problem identity", () => {
         title: "Building Teams",
       }),
     ).toBe("Building_Teams.cpp");
+    expect(
+      expectedSourceFilename({
+        platform: "atcoder",
+        problemKey: "abc446_d",
+        title: "Max Straight",
+      }),
+    ).toBe("abc446_d.cpp");
   });
 });
 
@@ -172,5 +184,23 @@ describe("reflection difficulty contract", () => {
         },
       }).problem.difficulty,
     ).toBeUndefined();
+  });
+
+  it("accepts an unrated AtCoder problem with adaptive difficulty", () => {
+    const parsed = SaveReflectionSchema.parse({
+      ...input,
+      problem: {
+        ...input.problem,
+        platform: "atcoder",
+        problem_key: "abc446_d",
+        url: "https://atcoder.jp/contests/abc446/tasks/abc446_d",
+        title: "Max Straight",
+        contest: "AtCoder Beginner Contest 446",
+        problem_index: "D",
+        difficulty: "medium",
+      },
+    });
+    expect(parsed.problem.platform).toBe("atcoder");
+    expect(parsed.problem.difficulty).toBe("medium");
   });
 });

@@ -33,7 +33,7 @@ async function sha256(value: string) {
 function listItem(row: Record<string, unknown>): ProblemListItem {
   return {
     id: String(row.id),
-    platform: row.platform as "codeforces" | "cses",
+    platform: row.platform as "codeforces" | "cses" | "atcoder",
     problemKey: String(row.problem_key),
     title: String(row.title),
     contest: (row.contest as string | null) ?? null,
@@ -212,7 +212,9 @@ export async function saveReflection(input: SaveReflectionInput) {
   const metadataProvenance = {
     ...input.problem.metadata_provenance,
     difficulty:
-      rating === null ? "codex_adaptive_v1" : "codeforces_rating_band_v1",
+      rating === null
+        ? "codex_adaptive_v1"
+        : `${input.problem.platform}_rating_band_v1`,
   };
 
   try {

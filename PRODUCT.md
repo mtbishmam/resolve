@@ -98,8 +98,8 @@ Difficulty is a separate single-select property:
 - Hard: rating from 2400 through 2999
 - Extreme: rating from 3000 through 3500
 
-Codeforces difficulty is derived from its numeric rating. Unrated CSES
-difficulty is assigned adaptively by Codex during reflection rather than copied
+Numeric problem ratings deterministically derive difficulty. Unrated problems
+receive adaptive difficulty from Codex during reflection rather than copied
 from a generic external list.
 
 Rating filtering uses inclusive start and end fields. Supplying only one field

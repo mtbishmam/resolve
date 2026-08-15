@@ -32,11 +32,27 @@ export function normalizeProblemUrl(value: string) {
     };
   }
 
+  if (host === "atcoder.jp") {
+    const match = url.pathname.match(/\/contests\/([^/]+)\/tasks\/([^/]+)/);
+    if (!match) throw new Error("Unsupported AtCoder problem URL");
+    const contest = match[1].toLowerCase();
+    const task = match[2].toLowerCase();
+    return {
+      platform: PlatformSchema.parse("atcoder"),
+      problemKey: task,
+      contest,
+      index: task.startsWith(`${contest}_`)
+        ? task.slice(contest.length + 1).toUpperCase()
+        : task.toUpperCase(),
+      canonicalUrl: `https://atcoder.jp/contests/${contest}/tasks/${task}`,
+    };
+  }
+
   throw new Error("Unsupported problem platform");
 }
 
 export function expectedSourceFilename(input: {
-  platform: "codeforces" | "cses";
+  platform: "codeforces" | "cses" | "atcoder";
   problemKey: string;
   title: string;
 }) {
@@ -44,5 +60,6 @@ export function expectedSourceFilename(input: {
     const [contest, index] = input.problemKey.split(":");
     return `${contest}${index}.cpp`;
   }
+  if (input.platform === "atcoder") return `${input.problemKey}.cpp`;
   return `${input.title.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")}.cpp`;
 }

@@ -48,7 +48,7 @@ const tools = [
             "statement_assets",
           ],
           properties: {
-            platform: { enum: ["codeforces", "cses"] },
+            platform: { enum: ["codeforces", "cses", "atcoder"] },
             problem_key: { type: "string" },
             url: { type: "string", format: "uri" },
             title: { type: "string" },
@@ -91,7 +91,7 @@ const tools = [
       type: "object",
       required: ["platform", "problem_key"],
       properties: {
-        platform: { enum: ["codeforces", "cses"] },
+        platform: { enum: ["codeforces", "cses", "atcoder"] },
         problem_key: { type: "string" },
       },
     },

@@ -119,6 +119,35 @@ try {
     "codeforces_rating_band_v1",
   );
 
+  const atcoderInput = {
+    ...input,
+    idempotency_key: "mcp-test-save-abc446-d",
+    problem: {
+      ...input.problem,
+      platform: "atcoder",
+      problem_key: "abc446_d",
+      url: "https://atcoder.jp/contests/abc446/tasks/abc446_d",
+      title: "Max Straight",
+      contest: "AtCoder Beginner Contest 446",
+      problem_index: "D",
+      rating: null,
+      difficulty: "medium",
+    },
+  };
+  const atcoder = await call("save_reflection", atcoderInput);
+  const atcoderStored = await call("get_problem", {
+    platform: "atcoder",
+    problem_key: "abc446_d",
+  });
+  assert.equal(atcoderStored.platform, "atcoder");
+  assert.equal(atcoderStored.problemKey, "abc446_d");
+  assert.equal(atcoderStored.difficulty, "medium");
+  assert.equal(
+    atcoderStored.metadataProvenance.difficulty,
+    "codex_adaptive_v1",
+  );
+  assert.equal(atcoderStored.reflection.id, atcoder.reflection_id);
+
   const due = await call("list_due_reviews", { date: "2026-07-31" });
   assert(due.some((problem) => problem.id === first.problem_id));
 
@@ -166,9 +195,8 @@ try {
 } finally {
   const wrangler = resolve(root, "node_modules", ".bin", "wrangler");
   execFileSync(
-    process.execPath,
+    wrangler,
     [
-      wrangler,
       "d1",
       "execute",
       "resolve-local",
@@ -178,7 +206,7 @@ try {
       "--persist-to",
       resolve(root, ".wrangler", "state"),
       "--command",
-      "DELETE FROM problems WHERE platform = 'codeforces' AND problem_key = '9999:A'",
+      "DELETE FROM problems WHERE (platform = 'codeforces' AND problem_key = '9999:A') OR (platform = 'atcoder' AND problem_key = 'abc446_d')",
     ],
     { cwd: root, stdio: "ignore" },
   );

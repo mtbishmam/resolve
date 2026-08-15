@@ -52,6 +52,9 @@ projections. Completed review history remains append-only in `reviews`.
 Constraints:
 
 - Unique `(platform, problem_key)`
+- Supported platforms are `codeforces`, `cses`, and `atcoder`.
+- AtCoder uses the task slug as `problem_key`, for example `abc446_d`; the
+  source filename is derived separately as `abc446_d.cpp`.
 - `title` is only the official problem name
 - URLs and filenames are not identities
 - Statement assets contain absolute external URLs initially
