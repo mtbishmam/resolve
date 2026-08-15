@@ -144,4 +144,5 @@ With the local app running, `npm run export:local` saves all three formats under
 the ignored `database-exports/` directory.
 
 Start with [CONTEXT.md](CONTEXT.md), [PRODUCT.md](PRODUCT.md),
-[ARCHITECTURE.md](ARCHITECTURE.md), and [DATA_MODEL.md](DATA_MODEL.md).
+[ARCHITECTURE.md](ARCHITECTURE.md), [DATA_MODEL.md](DATA_MODEL.md), and the
+[problem source adapter registry](PLATFORM_SOURCES.md).

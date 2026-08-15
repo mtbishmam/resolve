@@ -102,6 +102,11 @@ Supported MCP problem platforms are Codeforces, CSES, and AtCoder. AtCoder
 identity uses the task slug from `/contests/{contest}/tasks/{task}` as the
 problem key.
 
+Judge-page retrieval is governed by the shared statement contract and adapter
+registry in `PLATFORM_SOURCES.md`. The registry may document coaching-only
+sources without expanding the persistence enum. CodeChef and LightOJ are in
+that coaching-only state today.
+
 `record_review` appends review history and updates the next-review projection in
 one transaction.
 

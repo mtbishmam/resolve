@@ -50,6 +50,11 @@ its statement through `update_problem`. This content refresh never creates a
 second problem or alters Status, State, Sprint membership, due dates,
 reflections, or reviews unless those properties are explicitly supplied.
 
+Public judge URLs outside the persisted platform enum may still use coach mode
+and the pending-draft workflow. `PLATFORM_SOURCES.md` records this distinction.
+CodeChef and LightOJ are currently discussion sources only; they must never be
+reported as saved through the Codeforces/CSES/AtCoder MCP contract.
+
 ### Sprint problem flow
 
 1. Open **August Sprint** from the sidebar.

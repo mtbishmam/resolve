@@ -21,10 +21,11 @@ Extreme speed is the number-one requirement.
 
 ## Competitive-programming coach mode
 
-When the user pastes a problem statement or `resolve.capture.v1` payload and
-has not explicitly requested the full solution, editorial, algorithm, proof,
-pseudocode, or code, enter **coach mode**. A pasted problem is not permission
-to solve it completely.
+When the user provides a public problem URL, pastes a problem statement, or
+provides a `resolve.capture.v1` payload and has not explicitly requested the
+full solution, editorial, algorithm, proof, pseudocode, or code, enter **coach
+mode**. A problem URL or pasted statement is not permission to solve it
+completely.
 
 The first response in coach mode must contain only:
 
@@ -47,6 +48,12 @@ The standing detailed coaching contract is in
 
 Read `CONTEXT.md`, `PRODUCT.md`, `ARCHITECTURE.md`, and `DATA_MODEL.md` before
 changing product behavior or persistence.
+
+Read `PLATFORM_SOURCES.md` when a URL comes from a new judge or when platform
+support is unclear. Codeforces, CSES, and AtCoder are currently the only
+persisted MCP platforms. CodeChef and LightOJ URLs are valid for coaching and
+discussion but must remain explicitly **not saved** until their persistence
+contracts are implemented.
 
 ## Repository boundary
 

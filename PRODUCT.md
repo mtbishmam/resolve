@@ -72,6 +72,11 @@ and preserves an exact recoverable page snapshot. It does not use AI, hold
 database credentials, or write directly to ReSolve. It is not required for
 reflection, review, Sprint, mashup, or export functionality.
 
+Other public judges may be discussion sources before they become persisted
+platforms. The adapter registry in `PLATFORM_SOURCES.md` is authoritative for
+that boundary. LightOJ and CodeChef currently support URL coaching only, not
+durable ReSolve rows.
+
 Codex is the reflection interface. It reads the capture, optionally reads the
 user's solution, asks adaptive questions, preserves exact user wording,
 generates structured knowledge, assigns unrated problems an adaptive difficulty
