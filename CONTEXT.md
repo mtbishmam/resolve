@@ -67,6 +67,11 @@ Extreme speed is the number-one product requirement.
 - Archiving preserves Status and State instead of acting as another Status.
 - Pending AC is a saved view, not a special tag.
 - Raw interviews are append-only and must never be replaced by a summary.
+- `summary_markdown` is an objective problem-only summary: what is given, what
+  must be found or computed, the condition, and the output. It must not contain
+  the user's approach, mistakes, stuck point, breakthrough, algorithm choice,
+  or other metacognitive commentary. Those belong in the structured reflection
+  and the raw transcript.
 - Generated classifications may be regenerated later.
 
 ## Success

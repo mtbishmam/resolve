@@ -106,6 +106,14 @@ Rules:
 - Missing source is not an error
 - Transcript messages preserve ordered roles and exact content
 - Existing transcripts are immutable
+- `summary_markdown` contains only an objective, concise summary of the
+  problem statement. It must not contain the user's approach, mistakes, stuck
+  point, breakthrough, solution, or other metacognitive commentary.
+- `structured_summary_json` contains the learning analysis derived from the
+  user's reasoning, including the wrong mental model, failure, breakthrough,
+  trigger, pattern, and missing concepts.
+- `memory_cue` is a separate short reconstruction trigger, not a replacement
+  for either the problem summary or the transcript.
 - Later summaries create a new version or reflection rather than modifying the
   raw transcript
 

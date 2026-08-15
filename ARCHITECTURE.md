@@ -74,6 +74,22 @@ the adaptive difficulty supplied for an unrated problem, creates the first
 review schedule, and returns the saved identifiers and due date in one
 transaction.
 
+### Reflection output contract
+
+The persisted reflection keeps three kinds of content separate:
+
+- `summary_markdown` is the objective problem summary: input, task, condition,
+  and output, with story and personal reasoning removed.
+- `structured_summary_json` is the metacognitive analysis of how the user
+  reasoned, including approaches, mistakes, failure, breakthrough, and future
+  triggers.
+- `transcript_messages_json` preserves the exact ordered interview, while
+  `memory_cue` stores the shortest separate recall trigger.
+
+This separation is part of the save contract. A reflection is not ready to save
+if the problem summary contains first-person reasoning or commentary about the
+user's solution process.
+
 Supported MCP problem platforms are Codeforces, CSES, and AtCoder. AtCoder
 identity uses the task slug from `/contests/{contest}/tasks/{task}` as the
 problem key.

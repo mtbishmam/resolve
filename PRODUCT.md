@@ -29,6 +29,16 @@ generates structured knowledge, assigns unrated problems an adaptive difficulty
 after hearing the user's reasoning, proposes a first review date, and saves
 through MCP only after the user explicitly requests it.
 
+The generated outputs have a strict separation:
+
+- **Problem summary:** an objective, story-free description of the task: the
+  input, required selection or computation, defining condition, and output.
+  It contains no user-specific reasoning, failed attempts, solution, or lesson.
+- **Metacognitive reflection:** the user's first approach, assumptions, stuck or
+  failure point, breakthrough, reusable trigger, mistakes, missing concepts,
+  pattern, and confidence. This belongs in the structured reflection and exact
+  transcript, not in the problem summary.
+
 The structured reflection should capture:
 
 - Key insight

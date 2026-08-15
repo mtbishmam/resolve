@@ -19,6 +19,32 @@ friction. It is not a general note-taking app or a Notion clone.
 
 Extreme speed is the number-one requirement.
 
+## Competitive-programming coach mode
+
+When the user pastes a problem statement or `resolve.capture.v1` payload and
+has not explicitly requested the full solution, editorial, algorithm, proof,
+pseudocode, or code, enter **coach mode**. A pasted problem is not permission
+to solve it completely.
+
+The first response in coach mode must contain only:
+
+1. **Summary** — what the task asks, in simple language using the actual
+   variables.
+2. **Constraints** — only the constraints that affect complexity.
+3. **What I understood** — the precise interpretation of the task.
+4. **Hint 1** — one small directional hint, observation, or question.
+
+Then stop and wait for the user's response. Do not include the algorithm,
+key insight, proof, solution outline, editorial reasoning, implementation
+plan, code, or a revealing counterexample in the first response. If there is
+any ambiguity about whether the user wants coaching or a solution, coaching
+mode wins. Reveal progressively stronger hints only after the user engages or
+explicitly asks for more. Leave coach mode only when the user clearly asks for
+the complete solution, editorial, proof, pseudocode, or code.
+
+The standing detailed coaching contract is in
+[`resolve-coach.md`](<../../Library/Mobile Documents/iCloud~md~obsidian/Documents/obsidian/reapps/resolve-coach.md>).
+
 Read `CONTEXT.md`, `PRODUCT.md`, `ARCHITECTURE.md`, and `DATA_MODEL.md` before
 changing product behavior or persistence.
 
@@ -61,7 +87,20 @@ interviewed about a solved problem.
 9. Cover the first approach, assumptions, failure or stuck point, breakthrough,
    reusable trigger, and what the user would notice next time.
 10. Preserve ordered interview messages with exact roles and wording.
-11. Generate a compact summary and memory cue.
+11. Generate two separate outputs:
+    - `summary_markdown`: an objective, concise summary of the problem itself.
+      State what is given, what must be selected or computed, the defining
+      condition, and what to output. Remove story, character names, repetition,
+      and irrelevant narrative. Do not include the user's approach, mistakes,
+      stuck point, breakthrough, algorithm choice, or solution.
+    - `structured_summary`: the metacognitive learning analysis. Put the first
+      approach, assumptions, failure, breakthrough, reusable trigger, pattern,
+      mistakes, and missing concepts there; keep the exact interview wording in
+      the transcript.
+    Before saving, run a separation check: if `summary_markdown` mentions the
+    user's code or approach, a failed attempt, a breakthrough, or a lesson
+    learned, move that content to the structured reflection. Keep the memory
+    cue as a separate short reconstruction trigger.
 12. Derive Codeforces difficulty from rating. For an unrated CSES problem,
     assign one adaptive difficulty (`easy`, `medium`, `hard`, or `extreme`)
     based on the user's reasoning; do not reveal an external difficulty before
