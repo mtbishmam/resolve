@@ -60,6 +60,11 @@ Constraints:
 - `title` is only the official problem name
 - URLs and filenames are not identities
 - Statement assets contain absolute external URLs initially
+- `statement_markdown` stores the complete normalized judge statement, not the
+  concise `reflections.summary_markdown`
+- A statement refresh on an existing canonical row updates statement content,
+  hash, capture time, assets, and provenance while preserving workflow and
+  learning history
 - `difficulty` is nullable for genuinely unclassified legacy rows and otherwise
   one of `easy`, `medium`, `hard`, or `extreme`
 - A numeric rating deterministically owns its difficulty band; unrated problems

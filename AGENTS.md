@@ -72,10 +72,14 @@ problem in scope.
 Enter the workflow only when the user asks to reflect on, record, save, or be
 interviewed about a solved problem.
 
-1. Parse the pasted `resolve.capture.v1` object or obtain a canonical problem
-   URL.
+1. Prefer a canonical Codeforces, AtCoder, or CSES problem URL as the fastest,
+   most token-efficient input. Retrieve the official English statement and
+   normalize its TeX, sample blocks, metadata, and external images. Accept a
+   pasted `resolve.capture.v1` object or clean statement plus URL as fallbacks.
 2. Validate `(platform, problem_key)` and keep the title as only the official
-   problem name.
+   problem name. If the problem already exists, use `get_problem` and refresh
+   its complete statement with `update_problem`; do not create a duplicate or
+   replace the statement with `summary_markdown`.
 3. Derive the expected source filename and search
    `/Users/mtbishmam/code/competitive-programming/practice`.
 4. When one source file matches, read it as optional context.

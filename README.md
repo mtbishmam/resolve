@@ -24,8 +24,9 @@ Production: <https://resolve.mtbishmam.chatgpt.site>
 - Codex conducts adaptive reflections and writes through authenticated MCP.
 - The web app provides a cache-first problem database, stored statement reader,
   saved views, editing, review history, and a progressive no-AI review flow.
-- The Manifest V3 extension produces one `resolve.capture.v1` Codeforces
-  capture for pasting into Codex.
+- A canonical Codeforces, AtCoder, or CSES URL is the default, fastest input;
+  Codex retrieves and normalizes the official statement before MCP writes.
+- The Manifest V3 extension is an optional Codeforces snapshot fallback.
 
 The user’s C++ solutions remain in
 `/Users/mtbishmam/code/competitive-programming/practice`. ReSolve stores
@@ -114,6 +115,13 @@ calls `record_mashup_result`. That tool writes only Approaches, Lemmas, and
 Analysis—no problem insert is performed. The selected GPT model does not change
 these protocol or identity rules.
 
+For URL-first use, provide the canonical judge URL. Codex validates identity,
+retrieves the complete official statement, and calls `get_problem` before any
+write. If the row exists, `update_problem` refreshes only its sanitized
+statement content and provenance unless other properties are explicitly
+supplied. It never substitutes the concise reflection summary for the complete
+statement.
+
 ## Extension
 
 ```sh
@@ -121,7 +129,8 @@ npm run extension:build
 ```
 
 Load `extension/dist` as an unpacked Chromium extension. It contains no model
-calls, database credentials, or MCP token.
+calls, database credentials, or MCP token. Normal URL-first use does not require
+installing or opening the extension.
 
 ## Exports
 

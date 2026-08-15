@@ -49,7 +49,8 @@ actions.
 
 ## Product vocabulary
 
-- **Capture**: versioned problem data produced by the browser extension.
+- **Capture**: normalized problem data retrieved from an official URL or,
+  when needed, produced as an exact snapshot by the Codeforces extension.
 - **Reflection**: the Codex interview plus structured learning summary for one
   solved problem.
 - **Memory cue**: the shortest useful trigger that helps reconstruct the
@@ -59,10 +60,17 @@ actions.
 - **Status**: the objective progress of the initial solve and judge submission.
 - **State**: the nullable learning action currently queued for the problem.
 
-## Capture and reflection
+## URL ingestion, capture, and reflection
 
-The browser extension performs deterministic extraction. It does not use AI,
-hold database credentials, or write directly to ReSolve.
+The default input is a canonical Codeforces, AtCoder, or CSES problem URL.
+Codex retrieves the official English statement and normalizes identity,
+metadata, TeX, sample blocks, and external image links. A clean pasted
+statement with its URL is the fallback when a judge page cannot be read.
+
+The optional Codeforces browser extension performs deterministic extraction
+and preserves an exact recoverable page snapshot. It does not use AI, hold
+database credentials, or write directly to ReSolve. It is not required for
+reflection, review, Sprint, mashup, or export functionality.
 
 Codex is the reflection interface. It reads the capture, optionally reads the
 user's solution, asks adaptive questions, preserves exact user wording,
@@ -171,6 +179,12 @@ read time. The reader supports:
 
 Raw HTML is not rendered. Captured content must be sanitized and treated as
 untrusted data.
+
+A full statement and `summary_markdown` are different fields. The statement
+reader always stores the complete normalized judge statement; the short,
+story-free problem summary belongs only to a reflection. Refreshing a statement
+must never replace it with that summary or collapse sample input/output into a
+single paragraph.
 
 ## Review
 

@@ -176,12 +176,15 @@ const tools = [
   {
     name: "update_problem",
     description:
-      "Edit workflow properties without changing State or Status unless explicitly supplied. Archiving preserves both.",
+      "Update an existing canonical problem without creating a duplicate. Refreshing its normalized statement preserves reflections, reviews, Sprint membership, due date, State, and Status unless those workflow fields are explicitly supplied.",
     inputSchema: {
       type: "object",
       required: ["problem_id"],
       properties: {
         problem_id: { type: "string" },
+        title: { type: "string" },
+        contest: { type: ["string", "null"] },
+        problem_index: { type: ["string", "null"] },
         rating: { type: ["integer", "null"] },
         difficulty: {
           type: ["string", "null"],
@@ -200,6 +203,21 @@ const tools = [
         sprint_id: { type: ["string", "null"] },
         next_review_date: { type: ["string", "null"], format: "date" },
         official_tags: { type: "array", items: { type: "string" } },
+        statement_markdown: { type: "string" },
+        statement_assets: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["url", "alt"],
+            properties: {
+              url: { type: "string", format: "uri" },
+              alt: { type: "string" },
+            },
+          },
+        },
+        statement_captured_at: { type: "string", format: "date-time" },
+        metadata_status: { type: "string" },
+        metadata_provenance: { type: "object" },
       },
     },
     annotations: { destructiveHint: false, idempotentHint: true },
@@ -225,6 +243,9 @@ const tools = [
 
 const McpProblemUpdateSchema = z.object({
   problem_id: z.string().min(1),
+  title: z.string().min(1).optional(),
+  contest: z.string().min(1).nullable().optional(),
+  problem_index: z.string().min(1).nullable().optional(),
   rating: z.number().int().positive().max(3500).nullable().optional(),
   difficulty: DifficultySchema.nullable().optional(),
   state: ProblemStateSchema.nullable().optional(),
@@ -234,6 +255,13 @@ const McpProblemUpdateSchema = z.object({
   sprint_id: z.string().min(1).nullable().optional(),
   next_review_date: z.string().date().nullable().optional(),
   official_tags: z.array(z.string()).optional(),
+  statement_markdown: z.string().min(1).optional(),
+  statement_assets: z
+    .array(z.object({ url: z.string().url(), alt: z.string() }))
+    .optional(),
+  statement_captured_at: z.string().datetime().optional(),
+  metadata_status: z.string().min(1).optional(),
+  metadata_provenance: z.record(z.string(), z.string()).optional(),
 });
 
 function rpc(id: RpcRequest["id"], result: unknown) {
@@ -277,7 +305,7 @@ export async function POST(request: Request) {
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "resolve", version: "0.1.0" },
         instructions:
-          "ReSolve is a private competitive-programming learning system. Use canonical (platform, problem_key) identity. For a problem already present in a sprint, get it first; saving a reflection updates that canonical row and preserves sprint_id and due_date. For mashup approaches, lemmas, and analysis, call record_mashup_result with the existing mashup_id and problem_id; it never creates a problem. Retry is an unsolved reattempt, Revise is a speed re-solve, and Resolve is uncertain reconstruction. Never claim a write succeeded unless the tool result confirms it.",
+          "ReSolve is a private competitive-programming learning system. A canonical Codeforces, AtCoder, or CSES URL is the preferred input. Retrieve and normalize the complete official statement; never substitute the concise reflection summary for it. Use canonical (platform, problem_key) identity and call get_problem first. For an existing row, update_problem can refresh statement content without creating a duplicate or changing workflow history. For a problem already present in a sprint, saving a reflection preserves sprint_id and due_date. For mashup approaches, lemmas, and analysis, call record_mashup_result with the existing mashup_id and problem_id; it never creates a problem. Retry is an unsolved reattempt, Revise is a speed re-solve, and Resolve is uncertain reconstruction. Never claim a write succeeded unless the tool result confirms it.",
       });
     }
     if (payload.method === "notifications/initialized") {
@@ -314,6 +342,9 @@ export async function POST(request: Request) {
         const input = McpProblemUpdateSchema.parse(args);
         result = {
           updated: await updateProblemProperties(input.problem_id, {
+            title: input.title,
+            contest: input.contest,
+            problemIndex: input.problem_index,
             rating: input.rating,
             difficulty: input.difficulty,
             state: input.state,
@@ -323,6 +354,11 @@ export async function POST(request: Request) {
             sprintId: input.sprint_id,
             nextReviewDate: input.next_review_date,
             officialTags: input.official_tags,
+            statementMarkdown: input.statement_markdown,
+            statementAssets: input.statement_assets,
+            statementCapturedAt: input.statement_captured_at,
+            metadataStatus: input.metadata_status,
+            metadataProvenance: input.metadata_provenance,
           }),
         };
       } else if (name === "update_reflection") {

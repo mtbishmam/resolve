@@ -9,15 +9,19 @@ problems, reflections, reviews, saved views, sprints, and mashups.
 ## System boundary
 
 ```text
-Problem page
-  -> ReSolve browser extension
-  -> versioned capture JSON on clipboard
+Canonical problem URL (default)
+  -> Codex retrieves the official page
+  -> platform-aware normalized statement
   -> Codex in the ReSolve local project
   -> adaptive interview
   -> push_problem
   -> authenticated ReSolve MCP
   -> D1
   -> ReSolve web app on desktop and mobile
+
+Codeforces extension or pasted statement
+  -> fallback when direct URL retrieval fails
+  -> same normalization and MCP path
 ```
 
 There are two interfaces:
@@ -108,7 +112,9 @@ copied mashup packet.
 
 `list_sprints` lets the model discover stable Sprint IDs. `get_problem`
 followed by `update_problem` is the MCP path for attaching a problem that is
-already in the library. `save_reflection` handles the more common case: when
+already in the library. `update_problem` can also refresh a sanitized
+statement, assets, capture time, and provenance without creating a reflection
+or changing workflow history. `save_reflection` handles the more common case: when
 canonical identity already exists, it adds the new reflection and applies the
 explicit State and Status while preserving Sprint membership and due date.
 

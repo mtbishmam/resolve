@@ -401,6 +401,9 @@ export async function recordReview(input: RecordReviewInput) {
 export async function updateProblemProperties(
   id: string,
   input: {
+    title?: string;
+    contest?: string | null;
+    problemIndex?: string | null;
     rating?: number | null;
     difficulty?: Difficulty | null;
     state?: ProblemState | null;
@@ -410,13 +413,21 @@ export async function updateProblemProperties(
     sprintId?: string | null;
     nextReviewDate?: string | null;
     officialTags?: string[];
+    statementMarkdown?: string;
+    statementAssets?: Array<{ url: string; alt: string }>;
+    statementCapturedAt?: string;
+    metadataStatus?: string;
+    metadataProvenance?: Record<string, string>;
   },
 ) {
   const d1 = await getD1();
   const current = await d1
     .prepare(
-      `SELECT rating, difficulty, state, status, archived_at, due_date, sprint_id,
-              next_review_date, official_tags_json
+      `SELECT title, contest, problem_index, rating, difficulty, state, status,
+              archived_at, due_date, sprint_id,
+              next_review_date, official_tags_json, url, statement_markdown,
+              statement_assets_json, statement_hash, statement_captured_at,
+              metadata_status, metadata_provenance_json
        FROM problems WHERE id = ?1`,
     )
     .bind(id)
@@ -463,17 +474,38 @@ export async function updateProblemProperties(
           ),
         ];
   const now = new Date().toISOString();
+  const statement =
+    input.statementMarkdown === undefined
+      ? String(current.statement_markdown)
+      : sanitizeStatementMarkdown(input.statementMarkdown, String(current.url));
+  const statementChanged = input.statementMarkdown !== undefined;
+  const assets =
+    input.statementAssets === undefined
+      ? String(current.statement_assets_json)
+      : JSON.stringify(input.statementAssets);
+  const metadataProvenance = {
+    ...parseJson<Record<string, string>>(current.metadata_provenance_json, {}),
+    ...(input.metadataProvenance ?? {}),
+  };
+  if (provenance === null) delete metadataProvenance.difficulty;
+  else metadataProvenance.difficulty = provenance;
   await d1
     .prepare(
-      `UPDATE problems SET rating=?1, difficulty=?2, state=?3,
-       review_status=COALESCE(?3, review_status), status=?4, archived_at=?5,
-       due_date=?6, sprint_id=?7, next_review_date=?8, official_tags_json=?9,
-       metadata_provenance_json=CASE WHEN ?10 IS NULL
-         THEN json_remove(metadata_provenance_json, '$.difficulty')
-         ELSE json_set(metadata_provenance_json, '$.difficulty', ?10) END,
-       updated_at=?11 WHERE id=?12`,
+      `UPDATE problems SET title=?1, contest=?2, problem_index=?3,
+       rating=?4, difficulty=?5, state=?6,
+       review_status=COALESCE(?6, review_status), status=?7, archived_at=?8,
+       due_date=?9, sprint_id=?10, next_review_date=?11,
+       official_tags_json=?12, statement_markdown=?13,
+       statement_assets_json=?14, statement_hash=?15,
+       statement_captured_at=?16, metadata_status=?17,
+       metadata_provenance_json=?18, updated_at=?19 WHERE id=?20`,
     )
     .bind(
+      input.title?.trim() || current.title,
+      input.contest === undefined ? current.contest : input.contest,
+      input.problemIndex === undefined
+        ? current.problem_index
+        : input.problemIndex,
       rating,
       difficulty,
       state,
@@ -485,7 +517,13 @@ export async function updateProblemProperties(
         ? current.next_review_date
         : input.nextReviewDate,
       JSON.stringify(tags),
-      provenance,
+      statement,
+      assets,
+      statementChanged ? await sha256(statement) : current.statement_hash,
+      input.statementCapturedAt ??
+        (statementChanged ? now : current.statement_captured_at),
+      input.metadataStatus ?? current.metadata_status,
+      JSON.stringify(metadataProvenance),
       now,
       id,
     )

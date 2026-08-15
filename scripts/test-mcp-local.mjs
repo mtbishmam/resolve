@@ -177,8 +177,16 @@ try {
   assert.equal(duplicateReview.duplicate, true);
   const updatedProblem = await call("update_problem", {
     problem_id: first.problem_id,
+    title: "Fixture Problem Refreshed",
+    contest: "Fixture Contest",
+    problem_index: "A",
     status: "pending_ac",
     official_tags: ["math", "implementation"],
+    statement_markdown:
+      "## Problem Statement\n\nFind $x$ such that $x \\le n$.\n\n## Sample Input\n\n```text\n5\n```",
+    statement_assets: [],
+    metadata_status: "complete",
+    metadata_provenance: { statement: "official_url_v1" },
   });
   assert.equal(updatedProblem.updated, true);
   const updatedReflection = await call("update_reflection", {
@@ -192,6 +200,10 @@ try {
   });
   assert.equal(afterUpdate.status, "pending_ac");
   assert.equal(afterUpdate.state, "retry");
+  assert.equal(afterUpdate.title, "Fixture Problem Refreshed");
+  assert.equal(afterUpdate.contest, "Fixture Contest");
+  assert.match(afterUpdate.statementMarkdown, /## Sample Input/);
+  assert.equal(afterUpdate.metadataProvenance.statement, "official_url_v1");
   assert.equal(afterUpdate.reflection.memoryCue, "Edited fixture cue");
   const sprints = await call("list_sprints", {});
   assert(sprints.some((sprint) => sprint.id === "sprint-2026-08"));

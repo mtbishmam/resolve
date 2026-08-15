@@ -11,3 +11,7 @@ storage for recovery.
 
 The extension has no database credentials, MCP token, or model call.
 Its ReSolve homepage is <https://resolve.mtbishmam.chatgpt.site>.
+
+The fastest default workflow is to send Codex the canonical problem URL. Use
+this extension only when direct retrieval is blocked or an exact Codeforces
+page snapshot is useful. Downstream ReSolve features are identical either way.
