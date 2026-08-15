@@ -97,10 +97,10 @@ interviewed about a solved problem.
       approach, assumptions, failure, breakthrough, reusable trigger, pattern,
       mistakes, and missing concepts there; keep the exact interview wording in
       the transcript.
-    Before saving, run a separation check: if `summary_markdown` mentions the
-    user's code or approach, a failed attempt, a breakthrough, or a lesson
-    learned, move that content to the structured reflection. Keep the memory
-    cue as a separate short reconstruction trigger.
+      Before saving, run a separation check: if `summary_markdown` mentions the
+      user's code or approach, a failed attempt, a breakthrough, or a lesson
+      learned, move that content to the structured reflection. Keep the memory
+      cue as a separate short reconstruction trigger.
 12. Derive Codeforces difficulty from rating. For an unrated CSES problem,
     assign one adaptive difficulty (`easy`, `medium`, `hard`, or `extreme`)
     based on the user's reasoning; do not reveal an external difficulty before
@@ -236,10 +236,10 @@ does not require an empty Git commit.
 
 ### Canonical deployed Sites
 
-| Project | Hostname | Description |
-|---|---|---|
-| ReSync | https://resync.mtbishmam.chatgpt.site | Intentional video and reading consumption system using RePlay, ReRead, Inbox, cooldown, Queue, Finished, AI summaries, value scoring, grounded chat, notes, and learning memory. |
-| ReFocus | https://refocus.mtbishmam.chatgpt.site | Personal planning and focus-control system for daily plans, prioritized tasks, work cycles, screen-break overlays, agendas, routines, check-ins, streaks, metrics, offline use, and synchronization. |
+| Project | Hostname                               | Description                                                                                                                                                                                             |
+| ------- | -------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ReSync  | https://resync.mtbishmam.chatgpt.site  | Intentional video and reading consumption system using RePlay, ReRead, Inbox, cooldown, Queue, Finished, AI summaries, value scoring, grounded chat, notes, and learning memory.                        |
+| ReFocus | https://refocus.mtbishmam.chatgpt.site | Personal planning and focus-control system for daily plans, prioritized tasks, work cycles, screen-break overlays, agendas, routines, check-ins, streaks, metrics, offline use, and synchronization.    |
 | ReSolve | https://resolve.mtbishmam.chatgpt.site | Competitive-programming learning and active-recall system for problem capture, structured reflections, mistakes, mental models, memory cues, difficulty, status, review history, and spaced repetition. |
 
 ### Site identity rules

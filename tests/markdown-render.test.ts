@@ -23,5 +23,11 @@ describe("statement rendering", () => {
     expect(
       normalizeStatementText("1 \\le x \\le n and a_{l_i}, \\dots, a_{r_i}"),
     ).toBe("1 ≤ x ≤ n and a[l[i]], …, a[r[i]]");
+
+    expect(
+      normalizeStatementText(
+        "Split into \\frac{n}{k} parts, where 1 \\le k \\le 2\\cdot10^5 and x \\bmod m = 0.",
+      ),
+    ).toBe("Split into (n)/(k) parts, where 1 ≤ k ≤ 2·10^5 and x mod m = 0.");
   });
 });

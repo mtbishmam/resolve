@@ -2467,6 +2467,12 @@ button.primary,
   color: #fff;
 }
 
+.mashup-actions button.primary {
+  border-color: var(--forest);
+  background: var(--forest);
+  color: #fff;
+}
+
 .mashup-builder button.primary:disabled {
   cursor: wait;
   opacity: 0.65;

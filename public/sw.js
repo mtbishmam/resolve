@@ -4,11 +4,13 @@ const SHELL = [
   "/resolve-logo.png",
   "/icon-192.png",
   "/icon-512.png",
-  "/manifest.webmanifest"
+  "/manifest.webmanifest",
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL)));
+  event.waitUntil(
+    caches.open(SHELL_CACHE).then((cache) => cache.addAll(SHELL)),
+  );
   self.skipWaiting();
 });
 

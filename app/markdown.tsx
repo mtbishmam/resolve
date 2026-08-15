@@ -17,25 +17,64 @@ const schema = {
 };
 
 const TEX_REPLACEMENTS: Array<[RegExp, string]> = [
-  [/\\leq?\b/g, "≤"],
-  [/\\geq?\b/g, "≥"],
-  [/\\neq\b/g, "≠"],
-  [/\\(?:dots|ldots)\b/g, "…"],
-  [/\\cdot\b/g, "·"],
-  [/\\times\b/g, "×"],
-  [/\\infty\b/g, "∞"],
-  [/\\to\b/g, "→"],
+  [/\\leq?(?![A-Za-z])/g, "≤"],
+  [/\\geq?(?![A-Za-z])/g, "≥"],
+  [/\\lt(?![A-Za-z])/g, "<"],
+  [/\\gt(?![A-Za-z])/g, ">"],
+  [/\\neq(?![A-Za-z])/g, "≠"],
+  [/\\ne(?![A-Za-z])/g, "≠"],
+  [/\\equiv(?![A-Za-z])/g, "≡"],
+  [/\\(?:dots|ldots|cdots)(?![A-Za-z])/g, "…"],
+  [/\\cdot(?![A-Za-z])/g, "·"],
+  [/\\times(?![A-Za-z])/g, "×"],
+  [/\\infty(?![A-Za-z])/g, "∞"],
+  [/\\(?:to|rightarrow)(?![A-Za-z])/g, "→"],
+  [/\\leftrightarrow(?![A-Za-z])/g, "↔"],
+  [/\\notin(?![A-Za-z])/g, "∉"],
+  [/\\in(?![A-Za-z])/g, "∈"],
+  [/\\oplus(?![A-Za-z])/g, "⊕"],
+  [/\\(?:bmod|mod)(?![A-Za-z])/g, "mod"],
+  [/\\mid(?![A-Za-z])/g, "|"],
+  [/\\prod(?![A-Za-z])/g, "∏"],
+  [/\\sum(?![A-Za-z])/g, "∑"],
+  [/\\ell(?![A-Za-z])/g, "ℓ"],
+  [/\\lfloor(?![A-Za-z])/g, "⌊"],
+  [/\\rfloor(?![A-Za-z])/g, "⌋"],
+  [/\\(?:lvert|rvert)(?![A-Za-z])/g, "|"],
+  [/\\dagger(?![A-Za-z])/g, "†"],
+  [/\\ddagger(?![A-Za-z])/g, "‡"],
 ];
+
+function normalizeLooseTex(value: string) {
+  let clean = value;
+
+  for (let pass = 0; pass < 4; pass += 1) {
+    clean = clean.replace(/\\(?:d?frac)\{([^{}]+)\}\{([^{}]+)\}/g, "($1)/($2)");
+    clean = clean.replace(/\\color\{[^{}]+\}\{([^{}]*)\}/g, "$1");
+    clean = clean.replace(
+      /\\(?:mathrm|mathsf|mathtt|mathbf|textrm|texttt|textbf|text|operatorname|underline|underbrace|cancel)\{([^{}]*)\}/g,
+      "$1",
+    );
+  }
+
+  for (const [pattern, replacement] of TEX_REPLACEMENTS) {
+    clean = clean.replace(pattern, replacement);
+  }
+
+  clean = clean
+    .replace(/\\(?:left|right|limits|displaystyle|Big|require|tt)\b/g, "")
+    .replace(/\\([&%])/g, "$1")
+    .replace(/\\\s+/g, " ");
+
+  return clean;
+}
 
 export function normalizeStatementText(value: string) {
   return value
     .split(/(```[\s\S]*?```|`[^`]*`|\$\$[\s\S]*?\$\$|\$[^$\n]*\$)/g)
     .map((part) => {
       if (/^(`|\$)/.test(part)) return part;
-      let clean = part;
-      for (const [pattern, replacement] of TEX_REPLACEMENTS) {
-        clean = clean.replace(pattern, replacement);
-      }
+      let clean = normalizeLooseTex(part);
       // Captured Codeforces statements sometimes lose MathJax delimiters.
       // Array subscripts are clearer as indexed text than raw TeX in that case.
       for (let pass = 0; pass < 3; pass += 1) {
