@@ -7,7 +7,14 @@ import {
   type ProblemStatus,
 } from "@/lib/workflow";
 
-export const PlatformSchema = z.enum(["codeforces", "cses", "atcoder"]);
+export const PlatformSchema = z.enum([
+  "codeforces",
+  "cses",
+  "atcoder",
+  "codechef",
+  "lightoj",
+]);
+export type Platform = z.infer<typeof PlatformSchema>;
 export const DifficultySchema = z.enum(DIFFICULTIES);
 export const ProblemStateSchema = z.enum(PROBLEM_STATES);
 export const ProblemStatusSchema = z.enum(PROBLEM_STATUSES);
@@ -214,7 +221,7 @@ export type Mashup = {
 
 export type ProblemListItem = {
   id: string;
-  platform: "codeforces" | "cses" | "atcoder";
+  platform: Platform;
   problemKey: string;
   title: string;
   contest: string | null;

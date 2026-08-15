@@ -11,6 +11,7 @@ import {
 import { authorizeBrowserRequest } from "@/lib/auth";
 import {
   DifficultySchema,
+  PlatformSchema,
   ProblemStateSchema,
   ProblemStatusSchema,
   RecordReviewSchema,
@@ -58,7 +59,9 @@ const tools = [
             "statement_assets",
           ],
           properties: {
-            platform: { enum: ["codeforces", "cses", "atcoder"] },
+            platform: {
+              enum: ["codeforces", "cses", "atcoder", "codechef", "lightoj"],
+            },
             problem_key: { type: "string" },
             url: { type: "string", format: "uri" },
             title: { type: "string" },
@@ -102,7 +105,9 @@ const tools = [
       type: "object",
       required: ["platform", "problem_key"],
       properties: {
-        platform: { enum: ["codeforces", "cses", "atcoder"] },
+        platform: {
+          enum: ["codeforces", "cses", "atcoder", "codechef", "lightoj"],
+        },
         problem_key: { type: "string" },
       },
     },
@@ -305,7 +310,7 @@ export async function POST(request: Request) {
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "resolve", version: "0.1.0" },
         instructions:
-          "ReSolve is a private competitive-programming learning system. A canonical Codeforces, AtCoder, or CSES URL is the preferred input. Retrieve and normalize the complete official statement; never substitute the concise reflection summary for it. Use canonical (platform, problem_key) identity and call get_problem first. For an existing row, update_problem can refresh statement content without creating a duplicate or changing workflow history. For a problem already present in a sprint, saving a reflection preserves sprint_id and due_date. For mashup approaches, lemmas, and analysis, call record_mashup_result with the existing mashup_id and problem_id; it never creates a problem. Retry is an unsolved reattempt, Revise is a speed re-solve, and Resolve is uncertain reconstruction. Never claim a write succeeded unless the tool result confirms it.",
+          "ReSolve is a private competitive-programming learning system. A pasted problem statement can begin coaching immediately; resolve its canonical identity before persistence. Canonical Codeforces, AtCoder, CSES, CodeChef, and LightOJ URLs are supported. Retrieve and normalize the complete official statement; never substitute the concise reflection summary for it. Use canonical (platform, problem_key) identity and call get_problem first. For an existing row, update_problem can refresh statement content without creating a duplicate or changing workflow history. For a problem already present in a sprint, saving a reflection preserves sprint_id and due_date. For mashup approaches, lemmas, and analysis, call record_mashup_result with the existing mashup_id and problem_id; it never creates a problem. Retry is an unsolved reattempt, Revise is a speed re-solve, and Resolve is uncertain reconstruction. Never claim a write succeeded unless the tool result confirms it.",
       });
     }
     if (payload.method === "notifications/initialized") {
@@ -325,7 +330,10 @@ export async function POST(request: Request) {
         if (!input.platform || !input.problem_key) {
           throw new Error("platform and problem_key are required");
         }
-        result = await getProblemByIdentity(input.platform, input.problem_key);
+        result = await getProblemByIdentity(
+          PlatformSchema.parse(input.platform),
+          input.problem_key,
+        );
       } else if (name === "list_due_reviews") {
         const date = String((args as { date?: string }).date ?? "");
         if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {

@@ -16,7 +16,10 @@ For any public judge URL placed in scope:
    and external images.
 5. Establish a stable `(platform, problem_key)` before any database write.
 6. Use `get_problem` before updating an already persisted problem.
-7. Never claim persistence for a platform outside the MCP platform enum.
+7. A pasted statement may start coaching without a URL. Resolve a canonical
+   judge identity from pasted page metadata before saving; if the paste does
+   not contain enough identity, ask once for the official URL or problem code
+   at `push_problem` time.
 
 The complete statement should look equally polished regardless of source:
 proper mathematical notation, one semantic section per heading, and sample
@@ -24,13 +27,13 @@ input/output in separate fenced `text` blocks.
 
 ## Platform registry
 
-| Platform   | URL coaching | ReSolve persistence | Canonical key                         | Important extraction notes                                                                                   |
-| ---------- | ------------ | ------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Codeforces | Yes          | Yes                 | `{contest}:{index}`, such as `1899:C` | Preserve MathJax TeX and sample `<pre>` newlines; keep official tags hidden during initial reasoning.        |
-| CSES       | Yes          | Yes                 | Numeric task ID                       | Use the official title; preserve statement sections and samples.                                             |
-| AtCoder    | Yes          | Yes                 | Task slug, such as `abc446_d`         | Select the English statement, not the duplicated Japanese section; preserve TeX and every sample separately. |
-| CodeChef   | Yes          | No                  | Problem code for discussion only      | A source filename convention exists, but the current database and MCP platform enum do not accept CodeChef.  |
-| LightOJ    | Yes          | No                  | Problem slug for discussion only      | Preserve diagrams and reconstruct sample tables as separate multiline input/output blocks.                   |
+| Platform   | URL coaching | ReSolve persistence | Canonical key                             | Important extraction notes                                                                                   |
+| ---------- | ------------ | ------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Codeforces | Yes          | Yes                 | `{contest}:{index}`, such as `1899:C`     | Preserve MathJax TeX and sample `<pre>` newlines; keep official tags hidden during initial reasoning.        |
+| CSES       | Yes          | Yes                 | Numeric task ID                           | Use the official title; preserve statement sections and samples.                                             |
+| AtCoder    | Yes          | Yes                 | Task slug, such as `abc446_d`             | Select the English statement, not the duplicated Japanese section; preserve TeX and every sample separately. |
+| CodeChef   | Yes          | Yes                 | Uppercase problem code, such as `FLOW001` | Accept canonical and contest-scoped problem URLs; unrated problems use adaptive difficulty.                  |
+| LightOJ    | Yes          | Yes                 | Lowercase problem slug                    | Preserve diagrams and reconstruct sample tables as separate multiline input/output blocks.                   |
 
 “URL coaching” means Codex can read the page, enter coach mode, discuss the
 problem, inspect an optional local solution, and keep an unsaved pending draft.
@@ -45,27 +48,44 @@ Accepted problem URL form:
 https://lightoj.com/problem/{slug}
 ```
 
-Discussion identity:
+Persistent identity:
 
 ```text
 platform: lightoj
 problem_key: {slug}
 ```
 
-LightOJ is currently a discussion and coaching source, not a persisted ReSolve
-platform. If the user asks to save one, prepare a valid copyable payload marked
-**not saved** and explain that the platform enum, canonical URL parser, MCP
-schemas, frontend labels, exports, and tests must first gain LightOJ support.
-Never map it to another platform or invent a successful MCP write.
+LightOJ rows use the official lowercase slug as `problem_key`. Repeated saves
+for the same URL update the same canonical row and unlock the normal review,
+mashup, export, and statement-reader features.
+
+## CodeChef
+
+Accepted problem URL forms:
+
+```text
+https://www.codechef.com/problems/{CODE}
+https://www.codechef.com/{contest}/problems/{CODE}
+```
+
+Persistent identity:
+
+```text
+platform: codechef
+problem_key: {UPPERCASE_CODE}
+```
+
+ReSolve canonicalizes contest-scoped URLs to the stable `/problems/{CODE}`
+form. Source lookup uses `cc_{lowercase_problem_code}.cpp`.
 
 ### Closest Distance reference
 
 - Canonical URL: <https://lightoj.com/problem/closest-distance>
 - Official title: `Closest Distance`
-- Discussion key: `lightoj:closest-distance`
+- Persistent key: `lightoj:closest-distance`
 - Statement language: English
-- External diagram: retain its absolute LightOJ asset URL when a stored
-  statement is eventually supported
+- External diagram: retain its absolute LightOJ asset URL in the stored
+  statement
 - Parsing caution: the website presents sample input and output in a two-column
   table, and generic text extraction may collapse all lines into one line.
   Reconstruct the two columns as distinct fenced `text` blocks before using the
@@ -77,7 +97,7 @@ When this exact URL appears in a new chat, enter the normal ReSolve coach mode:
 respond first with only Summary, complexity-relevant Constraints, What I
 understood, and Hint 1 unless the user explicitly asks for a complete solution.
 
-## Adding durable support later
+## Adding another durable platform
 
 A new persisted platform is complete only when all of these agree:
 

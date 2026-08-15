@@ -50,10 +50,9 @@ Read `CONTEXT.md`, `PRODUCT.md`, `ARCHITECTURE.md`, and `DATA_MODEL.md` before
 changing product behavior or persistence.
 
 Read `PLATFORM_SOURCES.md` when a URL comes from a new judge or when platform
-support is unclear. Codeforces, CSES, and AtCoder are currently the only
-persisted MCP platforms. CodeChef and LightOJ URLs are valid for coaching and
-discussion but must remain explicitly **not saved** until their persistence
-contracts are implemented.
+support is unclear. Codeforces, CSES, AtCoder, CodeChef, and LightOJ are
+persisted MCP platforms. A pasted statement starts coaching immediately; a
+canonical identity is required only before persistence.
 
 ## Repository boundary
 

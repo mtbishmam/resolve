@@ -20,7 +20,8 @@ Canonical problem URL (default)
   -> ReSolve web app on desktop and mobile
 
 Codeforces extension or pasted statement
-  -> fallback when direct URL retrieval fails
+  -> coaching starts immediately
+  -> canonical identity resolved before persistence
   -> same normalization and MCP path
 ```
 
@@ -98,14 +99,14 @@ This separation is part of the save contract. A reflection is not ready to save
 if the problem summary contains first-person reasoning or commentary about the
 user's solution process.
 
-Supported MCP problem platforms are Codeforces, CSES, and AtCoder. AtCoder
-identity uses the task slug from `/contests/{contest}/tasks/{task}` as the
-problem key.
+Supported MCP problem platforms are Codeforces, CSES, AtCoder, CodeChef, and
+LightOJ. AtCoder identity uses the task slug from
+`/contests/{contest}/tasks/{task}`; CodeChef uses the uppercase problem code;
+LightOJ uses the lowercase problem slug.
 
 Judge-page retrieval is governed by the shared statement contract and adapter
 registry in `PLATFORM_SOURCES.md`. The registry may document coaching-only
-sources without expanding the persistence enum. CodeChef and LightOJ are in
-that coaching-only state today.
+sources without expanding the persistence enum.
 
 `record_review` appends review history and updates the next-review projection in
 one transaction.
@@ -142,6 +143,7 @@ Expected filenames:
 - Codeforces: `{contest}{index}.cpp`, for example `2179D.cpp`
 - AtCoder: `{contest_slug}_{task}.cpp`, for example `abc468_b.cpp`
 - CodeChef: `cc_{lowercase_problem_code}.cpp`
+- LightOJ: `loj_{underscore_separated_problem_slug}.cpp`
 - CSES: official title in underscore-separated title case
 - LeetCode: `lc_{lowercase_title_slug}.cpp`
 

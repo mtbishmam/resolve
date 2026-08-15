@@ -780,6 +780,21 @@ button {
   color: #39745d;
 }
 
+.platform-atcoder {
+  background: #f0ece7;
+  color: #705946;
+}
+
+.platform-codechef {
+  background: #f4ece6;
+  color: #8a5738;
+}
+
+.platform-lightoj {
+  background: #e9f2f7;
+  color: #356b83;
+}
+
 .status-retry {
   background: #f8e8e6;
   color: #aa4c45;
@@ -1172,11 +1187,15 @@ button.primary,
 
 .markdown h1,
 .markdown h2,
-.markdown h3 {
+.markdown h3,
+.markdown h4,
+.markdown h5,
+.markdown h6 {
   margin: 24px 0 8px;
   color: var(--ink);
   font-family: var(--font-geist), sans-serif;
   font-size: 13px;
+  font-weight: 760;
   letter-spacing: -0.02em;
 }
 

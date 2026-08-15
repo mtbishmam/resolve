@@ -29,6 +29,17 @@ describe("canonical problem identity", () => {
       "atcoder",
       "abc446_d",
     ],
+    ["https://www.codechef.com/problems/FLOW001", "codechef", "FLOW001"],
+    [
+      "https://www.codechef.com/START100/problems/ABCXYZ?tab=statement",
+      "codechef",
+      "ABCXYZ",
+    ],
+    [
+      "https://lightoj.com/problem/closest-distance",
+      "lightoj",
+      "closest-distance",
+    ],
   ])("normalizes %s", (url, platform, problemKey) => {
     expect(normalizeProblemUrl(url)).toMatchObject({ platform, problemKey });
   });
@@ -61,6 +72,20 @@ describe("canonical problem identity", () => {
         title: "Max Straight",
       }),
     ).toBe("abc446_d.cpp");
+    expect(
+      expectedSourceFilename({
+        platform: "codechef",
+        problemKey: "FLOW001",
+        title: "Add Two Numbers",
+      }),
+    ).toBe("cc_flow001.cpp");
+    expect(
+      expectedSourceFilename({
+        platform: "lightoj",
+        problemKey: "closest-distance",
+        title: "Closest Distance",
+      }),
+    ).toBe("loj_closest_distance.cpp");
   });
 });
 
@@ -206,6 +231,30 @@ describe("reflection difficulty contract", () => {
     expect(parsed.problem.platform).toBe("atcoder");
     expect(parsed.problem.difficulty).toBe("medium");
   });
+
+  it.each([
+    ["codechef", "FLOW001", "https://www.codechef.com/problems/FLOW001"],
+    [
+      "lightoj",
+      "closest-distance",
+      "https://lightoj.com/problem/closest-distance",
+    ],
+  ] as const)(
+    "accepts an unrated %s problem with adaptive difficulty",
+    (platform, problemKey, url) => {
+      const parsed = SaveReflectionSchema.parse({
+        ...input,
+        problem: {
+          ...input.problem,
+          platform,
+          problem_key: problemKey,
+          url,
+          difficulty: "medium",
+        },
+      });
+      expect(parsed.problem.platform).toBe(platform);
+    },
+  );
 });
 
 describe("mashup contract", () => {

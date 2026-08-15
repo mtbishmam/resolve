@@ -69,8 +69,88 @@ function normalizeLooseTex(value: string) {
   return clean;
 }
 
-export function normalizeStatementText(value: string) {
+function isSymbolicInputBlock(value: string) {
+  const lines = value
+    .trim()
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  if (lines.length === 0 || lines.length > 12) return false;
+  if (lines.some((line) => line.length > 180)) return false;
+
+  const words = lines
+    .join(" ")
+    .replace(/\\[A-Za-z]+/g, "")
+    .replace(/\.\.\./g, "")
+    .match(/[A-Za-z]+/g);
+  return Boolean(words?.length && words.every((word) => word.length <= 3));
+}
+
+function symbolicLineToTex(value: string) {
   return value
+    .trim()
+    .replace(/^\$|\$$/g, "")
+    .replace(/\.\.\./g, "\\ldots")
+    .replace(/<=/g, "\\le ")
+    .replace(/>=/g, "\\ge ")
+    .replace(/\s+/g, " \\quad ");
+}
+
+export function normalizeSymbolicInputBlocks(value: string) {
+  const lines = value.split("\n");
+  const output: string[] = [];
+  let section = "";
+
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const heading = line.match(/^#{1,6}\s+(.+?)\s*$/);
+    if (heading) section = heading[1].trim().toLowerCase();
+
+    const fence = line.match(/^```(?:text|plaintext)?\s*$/i);
+    if (!fence) {
+      output.push(line);
+      continue;
+    }
+
+    const block: string[] = [];
+    let end = index + 1;
+    while (end < lines.length && !/^```\s*$/.test(lines[end])) {
+      block.push(lines[end]);
+      end += 1;
+    }
+
+    const isInputFormat = /^(?:input|input format)$/.test(section);
+    if (
+      end < lines.length &&
+      isInputFormat &&
+      isSymbolicInputBlock(block.join("\n"))
+    ) {
+      output.push(
+        "$$",
+        "\\begin{gathered}",
+        block
+          .map(symbolicLineToTex)
+          .filter(Boolean)
+          .join(" \\\\" + "\n"),
+        "\\end{gathered}",
+        "$$",
+      );
+      index = end;
+      continue;
+    }
+
+    output.push(line, ...block);
+    if (end < lines.length) {
+      output.push(lines[end]);
+      index = end;
+    }
+  }
+
+  return output.join("\n");
+}
+
+export function normalizeStatementText(value: string) {
+  return normalizeSymbolicInputBlocks(value)
     .split(/(```[\s\S]*?```|`[^`]*`|\$\$[\s\S]*?\$\$|\$[^$\n]*\$)/g)
     .map((part) => {
       if (/^(`|\$)/.test(part)) return part;
@@ -87,11 +167,11 @@ export function normalizeStatementText(value: string) {
 }
 
 export default function Markdown({
-  children,
+  children = "",
   className = "",
   statement = false,
 }: {
-  children: string;
+  children?: string;
   className?: string;
   statement?: boolean;
 }) {

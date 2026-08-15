@@ -150,6 +150,47 @@ try {
   );
   assert.equal(atcoderStored.reflection.id, atcoder.reflection_id);
 
+  for (const fixture of [
+    {
+      platform: "codechef",
+      problem_key: "FLOW001",
+      url: "https://www.codechef.com/problems/FLOW001",
+      title: "Add Two Numbers",
+      contest: "CodeChef",
+      problem_index: "FLOW001",
+    },
+    {
+      platform: "lightoj",
+      problem_key: "closest-distance",
+      url: "https://lightoj.com/problem/closest-distance",
+      title: "Closest Distance",
+      contest: "LightOJ",
+      problem_index: null,
+    },
+  ]) {
+    const platformInput = {
+      ...input,
+      idempotency_key: `mcp-test-save-${fixture.platform}`,
+      problem: {
+        ...input.problem,
+        ...fixture,
+        rating: null,
+        difficulty: "medium",
+      },
+    };
+    const saved = await call("save_reflection", platformInput);
+    const savedAgain = await call("save_reflection", platformInput);
+    const platformStored = await call("get_problem", {
+      platform: fixture.platform,
+      problem_key: fixture.problem_key,
+    });
+    assert.equal(saved.problem_id, savedAgain.problem_id);
+    assert.equal(savedAgain.duplicate, true);
+    assert.equal(platformStored.platform, fixture.platform);
+    assert.equal(platformStored.problemKey, fixture.problem_key);
+    assert.equal(platformStored.difficulty, "medium");
+  }
+
   const due = await call("list_due_reviews", { date: "2026-07-31" });
   assert(due.some((problem) => problem.id === first.problem_id));
 
@@ -284,7 +325,9 @@ try {
       resolve(root, ".wrangler", "state"),
       "--command",
       `DELETE FROM problems WHERE (platform = 'codeforces' AND problem_key = '9999:A')
-       OR (platform = 'atcoder' AND problem_key = 'abc446_d');
+       OR (platform = 'atcoder' AND problem_key = 'abc446_d')
+       OR (platform = 'codechef' AND problem_key = 'FLOW001')
+       OR (platform = 'lightoj' AND problem_key = 'closest-distance');
        DELETE FROM reflections WHERE idempotency_key = 'mcp-test-existing-sprint-1920-c';
        UPDATE problems SET state = NULL, status = 'backlog', next_review_date = NULL
        WHERE platform = 'codeforces' AND problem_key = '1920:C';`,

@@ -162,7 +162,10 @@ function statusLabel(status: string) {
 function platformLabel(platform: string) {
   if (platform === "codeforces") return "Codeforces";
   if (platform === "cses") return "CSES";
-  return "AtCoder";
+  if (platform === "atcoder") return "AtCoder";
+  if (platform === "codechef") return "CodeChef";
+  if (platform === "lightoj") return "LightOJ";
+  return platform;
 }
 
 function DifficultyTag({ difficulty }: { difficulty: Difficulty | null }) {
@@ -1117,6 +1120,8 @@ export default function ReSolveApp({
                 <option value="codeforces">Codeforces</option>
                 <option value="cses">CSES</option>
                 <option value="atcoder">AtCoder</option>
+                <option value="codechef">CodeChef</option>
+                <option value="lightoj">LightOJ</option>
               </select>
             </label>
             <label>

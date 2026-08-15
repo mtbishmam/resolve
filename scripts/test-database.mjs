@@ -154,6 +154,35 @@ try {
   assert.equal(workflow[0].mashups, 0);
   assert.equal(workflow[0].reflectionless_reviews, 1);
   assert.equal(workflow[0].migrated_filter, '["retry"]');
+
+  d1([
+    "--command",
+    `INSERT INTO problems (
+       id, platform, problem_key, url, title, statement_markdown,
+       created_at, updated_at
+     ) VALUES (
+       'atcoder-format-fixture', 'atcoder', 'abc446_d',
+       'https://atcoder.jp/contests/abc446/tasks/abc446_d', 'Max Straight',
+       '## Input
+
+\`\`\`text
+N
+A_1 A_2 ... A_N
+\`\`\`',
+       '2026-08-15T00:00:00.000Z', '2026-08-15T00:00:00.000Z'
+     )`,
+  ]);
+  d1(["--file", resolve(root, "drizzle", "0016_polish_statement_math.sql")]);
+  const polishedStatement = query(
+    `SELECT statement_markdown, statement_hash
+     FROM problems WHERE id = 'atcoder-format-fixture'`,
+  )[0];
+  assert.ok(polishedStatement.statement_markdown.includes("\\begin{gathered}"));
+  assert.ok(!polishedStatement.statement_markdown.includes("A_1 A_2 ... A_N"));
+  assert.equal(
+    polishedStatement.statement_hash,
+    "51b01a5f35ce5bf3f15af0835dda97f2549145de950de69522cc618be64d09f3",
+  );
   console.log("D1 migrations and double seed passed.");
 } finally {
   await rm(temp, { recursive: true, force: true });

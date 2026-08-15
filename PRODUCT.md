@@ -62,10 +62,12 @@ actions.
 
 ## URL ingestion, capture, and reflection
 
-The default input is a canonical Codeforces, AtCoder, or CSES problem URL.
-Codex retrieves the official English statement and normalizes identity,
-metadata, TeX, sample blocks, and external image links. A clean pasted
-statement with its URL is the fallback when a judge page cannot be read.
+The default input is a canonical Codeforces, AtCoder, CSES, CodeChef, or
+LightOJ problem URL. Codex retrieves the official English statement and
+normalizes identity, metadata, TeX, sample blocks, and external image links. A
+clean pasted statement can start coaching immediately. Before persistence,
+Codex resolves its identity from pasted page metadata or asks once for the
+official URL/problem code when needed.
 
 The optional Codeforces browser extension performs deterministic extraction
 and preserves an exact recoverable page snapshot. It does not use AI, hold
@@ -74,8 +76,8 @@ reflection, review, Sprint, mashup, or export functionality.
 
 Other public judges may be discussion sources before they become persisted
 platforms. The adapter registry in `PLATFORM_SOURCES.md` is authoritative for
-that boundary. LightOJ and CodeChef currently support URL coaching only, not
-durable ReSolve rows.
+that boundary. CodeChef and LightOJ now use the same durable ReSolve workflow
+as Codeforces, CSES, and AtCoder.
 
 Codex is the reflection interface. It reads the capture, optionally reads the
 user's solution, asks adaptive questions, preserves exact user wording,
@@ -179,6 +181,7 @@ read time. The reader supports:
 - Input and output sections
 - Examples
 - TeX mathematics
+- Mathematical input-format schematics while real samples remain monospace
 - External diagrams and images
 - Link to the original judge page
 

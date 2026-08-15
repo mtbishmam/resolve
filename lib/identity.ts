@@ -1,4 +1,4 @@
-import { PlatformSchema } from "./contracts";
+import { PlatformSchema, type Platform } from "./contracts";
 
 export function normalizeProblemUrl(value: string) {
   const url = new URL(value.trim());
@@ -48,11 +48,44 @@ export function normalizeProblemUrl(value: string) {
     };
   }
 
+  if (host === "codechef.com") {
+    const segments = url.pathname.split("/").filter(Boolean);
+    const problemsIndex = segments.lastIndexOf("problems");
+    const code = segments[problemsIndex + 1]?.toUpperCase();
+    if (problemsIndex < 0 || !code || !/^[A-Z0-9_]+$/.test(code)) {
+      throw new Error("Unsupported CodeChef problem URL");
+    }
+    const contestSegment =
+      problemsIndex === 1 && segments[0].toLowerCase() !== "practice"
+        ? segments[0]
+        : null;
+    return {
+      platform: PlatformSchema.parse("codechef"),
+      problemKey: code,
+      contest: contestSegment ?? "CodeChef",
+      index: code,
+      canonicalUrl: `https://www.codechef.com/problems/${code}`,
+    };
+  }
+
+  if (host === "lightoj.com") {
+    const match = url.pathname.match(/^\/problem\/([a-z0-9-]+)\/?$/i);
+    if (!match) throw new Error("Unsupported LightOJ problem URL");
+    const slug = match[1].toLowerCase();
+    return {
+      platform: PlatformSchema.parse("lightoj"),
+      problemKey: slug,
+      contest: "LightOJ",
+      index: null,
+      canonicalUrl: `https://lightoj.com/problem/${slug}`,
+    };
+  }
+
   throw new Error("Unsupported problem platform");
 }
 
 export function expectedSourceFilename(input: {
-  platform: "codeforces" | "cses" | "atcoder";
+  platform: Platform;
   problemKey: string;
   title: string;
 }) {
@@ -61,5 +94,11 @@ export function expectedSourceFilename(input: {
     return `${contest}${index}.cpp`;
   }
   if (input.platform === "atcoder") return `${input.problemKey}.cpp`;
+  if (input.platform === "codechef") {
+    return `cc_${input.problemKey.toLowerCase()}.cpp`;
+  }
+  if (input.platform === "lightoj") {
+    return `loj_${input.problemKey.toLowerCase().replace(/[^a-z0-9]+/g, "_")}.cpp`;
+  }
   return `${input.title.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "")}.cpp`;
 }

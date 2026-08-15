@@ -1,6 +1,7 @@
 import type {
   CreateMashupInput,
   Mashup,
+  Platform,
   ProblemDetail,
   ProblemListItem,
   RecordMashupResultInput,
@@ -37,7 +38,7 @@ async function sha256(value: string) {
 function listItem(row: Record<string, unknown>): ProblemListItem {
   return {
     id: String(row.id),
-    platform: row.platform as "codeforces" | "cses" | "atcoder",
+    platform: row.platform as Platform,
     problemKey: String(row.problem_key),
     title: String(row.title),
     contest: (row.contest as string | null) ?? null,
