@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   CaptureSchema,
-  CreateMashupSchema,
-  RecordMashupResultSchema,
-  RecordReviewSchema,
   SaveReflectionSchema,
   TranscriptMessageSchema,
 } from "@/lib/contracts";
@@ -24,6 +21,11 @@ describe("canonical problem identity", () => {
       "1554:B",
     ],
     ["https://cses.fi/problemset/task/1668/", "cses", "1668"],
+    [
+      "https://atcoder.jp/contests/abc446/tasks/abc446_d?lang=en",
+      "atcoder",
+      "abc446_d",
+    ],
   ])("normalizes %s", (url, platform, problemKey) => {
     expect(normalizeProblemUrl(url)).toMatchObject({ platform, problemKey });
   });
@@ -49,6 +51,13 @@ describe("canonical problem identity", () => {
         title: "Building Teams",
       }),
     ).toBe("Building_Teams.cpp");
+    expect(
+      expectedSourceFilename({
+        platform: "atcoder",
+        problemKey: "abc446_d",
+        title: "Max Straight",
+      }),
+    ).toBe("abc446_d.cpp");
   });
 });
 
@@ -176,45 +185,22 @@ describe("reflection difficulty contract", () => {
       }).problem.difficulty,
     ).toBeUndefined();
   });
-});
 
-describe("mashup contract", () => {
-  it("accepts a backdated five-hour focused session", () => {
-    const parsed = CreateMashupSchema.parse({
-      sprint_id: "sprint-2026-08",
-      problem_ids: ["problem-a", "problem-b"],
-      duration_seconds: 5 * 60 * 60,
-      started_at: "2026-08-04T00:00:00.000Z",
+  it("accepts an unrated AtCoder problem with adaptive difficulty", () => {
+    const parsed = SaveReflectionSchema.parse({
+      ...input,
+      problem: {
+        ...input.problem,
+        platform: "atcoder",
+        problem_key: "abc446_d",
+        url: "https://atcoder.jp/contests/abc446/tasks/abc446_d",
+        title: "Max Straight",
+        contest: "AtCoder Beginner Contest 446",
+        problem_index: "D",
+        difficulty: "medium",
+      },
     });
-    expect(parsed.problem_ids).toHaveLength(2);
-    expect(parsed.duration_seconds).toBe(18_000);
-  });
-
-  it("accepts notes for an existing mashup problem", () => {
-    const parsed = RecordMashupResultSchema.parse({
-      mashup_id: "mashup-a",
-      problem_id: "problem-a",
-      approaches: "Binary search on the answer",
-      lemmas: "Feasibility is monotone",
-      analysis: "O(n log n)",
-    });
-    expect(parsed.problem_id).toBe("problem-a");
-  });
-});
-
-describe("review contract", () => {
-  it("records a timed Retry before a reflection exists", () => {
-    const parsed = RecordReviewSchema.parse({
-      idempotency_key: "retry-without-reflection",
-      problem_id: "problem-a",
-      reflection_id: null,
-      due_date: "2026-08-05",
-      outcome: "unresolved",
-      deepest_reveal: "none",
-      timer_limit_seconds: 1800,
-      timer_elapsed_seconds: 1811,
-    });
-    expect(parsed.reflection_id).toBeNull();
-    expect(parsed.timer_elapsed_seconds).toBe(1811);
+    expect(parsed.problem.platform).toBe("atcoder");
+    expect(parsed.problem.difficulty).toBe("medium");
   });
 });

@@ -6,47 +6,6 @@ without inventing missing problems. August 2026 targets the 1600, 1700, 1800,
 and 1900 CP31 bands at five problems per day, one seven-day block per band;
 September remains to be decided.
 
-### Sprint flow
-
-The current Sprint card opens a dedicated problem view. August contains the
-124 canonical CP31 problems from the 1600, 1700, 1800, and 1900 lists. The
-shifted schedule starts on August 5:
-
-- 1600: August 5–11
-- 1700: August 12–18
-- 1800: August 19–25
-- 1900: August 26–September 1
-
-Each band assigns five problems on each of its first six days and its final
-problem on day seven, leaving four problems of daily capacity as offset. New
-rows begin as Backlog with no State. A row already present under the same
-canonical `(platform, problem_key)` is attached to the Sprint and receives its
-due date without losing Status, State, archive history, reviews, reflections,
-or richer stored content.
-
-Problems can be selected across any desktop view or mobile card list to create
-a focused mashup. Selection persists while switching views. A mashup shows one
-stored statement per tab, one global timer, a separate accumulated timer per
-tab, and per-problem Approaches, Lemmas, and Analysis fields. Its start may be
-any earlier instant,
-so a session started at 06:00 can be created at 06:11 with eleven minutes
-already elapsed. Timer state is saved periodically and when exiting or
-finishing. Profile → Mashups opens dated result history with copy and delete
-actions.
-
-### Mashup result flow
-
-1. Select problems from one or more views and choose **Create mashup**.
-2. Set a current or earlier start and the global duration. The button shows a
-   creating state until the persisted session opens.
-3. Solve from full-width stored statements; tab time and the three result fields
-   autosave.
-4. Finish or save and exit. Open Profile → Mashups to inspect the complete
-   dated result.
-5. **Copy for ChatGPT** copies the statement, identifiers, Approaches, Lemmas,
-   and Analysis. ChatGPT calls `record_mashup_result` with the existing IDs; it
-   does not create a problem.
-
 ## Product vocabulary
 
 - **Capture**: versioned problem data produced by the browser extension.
@@ -139,8 +98,8 @@ Difficulty is a separate single-select property:
 - Hard: rating from 2400 through 2999
 - Extreme: rating from 3000 through 3500
 
-Codeforces difficulty is derived from its numeric rating. Unrated CSES
-difficulty is assigned adaptively by Codex during reflection rather than copied
+Numeric problem ratings deterministically derive difficulty. Unrated problems
+receive adaptive difficulty from Codex during reflection rather than copied
 from a generic external list.
 
 Rating filtering uses inclusive start and end fields. Supplying only one field
@@ -166,11 +125,6 @@ untrusted data.
 
 Pressing **Start review** does not reveal the saved answer and does not require
 Codex.
-
-The timer starts when the focused review surface opens. Revise uses 10/20/30/30
-minutes for Easy/Medium/Hard/Extreme. Retry and Resolve use 10/30/60/90.
-Successful unaided Revise archives the problem while preserving Status and
-State; any unsuccessful result is rescheduled.
 
 It begins a progressive retrieval session:
 

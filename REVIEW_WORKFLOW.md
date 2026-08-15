@@ -8,11 +8,9 @@
 - **Retry:** previously unsolved. Easy 10m, Medium 30m, Hard 60m, Extreme 90m.
 - **Resolve:** uncertain reconstruction. It uses the Retry timer matrix.
 
-State is nullable and independent from Status. Starting a review leaves Status
-unchanged and starts the State/difficulty timer at zero. Finishing records
-timer limit/elapsed seconds. A recalled Revise archives the problem;
-archiving preserves State and Status. Other outcomes keep it active and apply
-the selected next-review date.
+State is nullable and independent from Status. Starting a review marks the
+problem Attempting. Finishing records timer limit/elapsed seconds and never
+silently rewrites State or Status.
 
 ## Purpose
 
@@ -59,9 +57,7 @@ The user may reveal, in order:
 4. Source code, when available
 
 ReSolve records the deepest reveal reached. Source code absence never blocks a
-review. A saved reflection is also optional: Retry and Resolve can record a
-timed attempt against the stored statement before any reflection exists, with
-the reveal controls unavailable.
+review.
 
 ## Completion
 
@@ -75,11 +71,6 @@ The user selects one outcome:
 ReSolve appends a review event, calculates the next review date using the active
 schedule version, and shows the new date. The user may override the date before
 confirming.
-
-For Revise, **Recalled** is the successful insta-solve outcome and archives the
-problem. Needed cue, Forgot, and Unresolved are unsuccessful and reschedule it.
-Retry and Resolve always retain the explicit next-review date selected at
-completion.
 
 A review outcome never changes Status because Status records solve and judge
 progress. Any State change after review is explicit rather than inferred from

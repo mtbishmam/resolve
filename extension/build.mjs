@@ -6,8 +6,7 @@ const root = import.meta.dirname;
 const dist = resolve(root, "dist");
 await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
-execFileSync(process.execPath, [
-  resolve(root, "..", "node_modules", "typescript", "bin", "tsc"),
+execFileSync(resolve(root, "..", "node_modules", ".bin", "tsc"), [
   "-p",
   resolve(root, "tsconfig.json"),
 ]);

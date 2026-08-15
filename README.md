@@ -1,20 +1,13 @@
 # ReSolve
 
 The hosted app is cloud-synced through its private Cloudflare D1 database. The
-problem index and opened details are cached in IndexedDB for instant startup,
-then refreshed from D1 in the background. **Download for offline use** stores
-every problem detail locally; the installed PWA can reopen cached reads while
-online writes continue to sync to D1.
+problem index is cached in IndexedDB for instant startup, then refreshed from D1
+in the background; writes require a network connection.
 
 Workflow is split into nullable **State** (`Retry`, `Revise`, `Resolve`) and
 **Status** (`Backlog`, `Attempting`, `Pending AC`, `Accepted`). Archiving
 preserves both. Due Today is the default view, and August 2026 is the CP31 Sheet
 sprint for existing 1600–1900 problems.
-
-August is seeded from the checked-in CP31 snapshot: 124 canonical problems,
-five per day within each seven-day rating block, starting August 5 and ending
-September 1. Select problems in any view for a persistent focused mashup with
-global and per-problem timers plus Approaches, Lemmas, and Analysis notes.
 
 ReSolve is a private, speed-first competitive-programming reflection and
 active-recall system.
@@ -86,33 +79,13 @@ server-side `RESOLVE_MCP_TOKEN`; local use accepts
 
 Tools:
 
-- `list_sprints`
 - `save_reflection`
 - `get_problem`
 - `list_due_reviews`
 - `record_review`
-- `record_mashup_result`
-- `update_problem`
-- `update_reflection`
 
 Writes are Zod-validated, batched atomically in D1, and idempotent. Transcript
 messages retain exact ordered roles and content.
-
-If a CP31 problem already exists, the canonical upsert attaches the Sprint and
-due date without replacing its workflow, archive, reviews, reflections, or
-richer content. A later `save_reflection` preserves that Sprint schedule while
-applying the Status and State supplied by the completed reflection.
-
-For ChatGPT developer testing, add the public HTTPS `/api/mcp` endpoint as a
-Streamable HTTP connection and refresh its metadata after deployment. The
-hosted ChatGPT surface can use its authenticated session. Generic remote MCP
-hosting requires MCP OAuth 2.1; ChatGPT does not accept a custom API key in
-place of that flow. For an existing problem, ChatGPT first uses `get_problem`;
-a reflection uses `save_reflection`, whose canonical upsert updates the same
-row. A copied mashup packet includes `mashup_id` and `problem_id`, so ChatGPT
-calls `record_mashup_result`. That tool writes only Approaches, Lemmas, and
-Analysis—no problem insert is performed. The selected GPT model does not change
-these protocol or identity rules.
 
 ## Extension
 

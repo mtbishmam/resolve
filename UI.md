@@ -7,22 +7,10 @@ User saved views are separate and deletable.
 `Cmd+K`/`Ctrl+K` focuses search. Filters include State, Status, tags, platform,
 difficulty, and rating. Overview shows the plain-language Summary, while Memory
 Cue and Key Insight live in Reflection. Official tags are hidden until
-requested. Clicking a row outside an inline editor opens its stored statement
-in a Notion-style overlay side peek without shrinking the table. Difficulty,
-REVIEW STATE, Status, Review Date, tags, archive state,
+requested. Difficulty, REVIEW STATE, Status, Review Date, tags, archive state,
 and all generated reflection fields are editable; the raw transcript stays
 immutable. The side peek is drag-resizable, overlays above 700px, and supports
 full-page problems.
-
-The current Sprint card is interactive. Opening it replaces the saved-view
-filter with the Sprint membership, sorts by Sprint due date, and exposes inline
-State, Status, and due-date editors. Visible columns persist when views change.
-The August view contains all 124 CP31 problems. Desktop rows and mobile cards
-in every view support selection; **Create mashup**
-opens the duration and backdated-start form, then a full-screen statement-only
-workspace with problem tabs, a global timer, per-tab timers, and Approaches,
-Lemmas, and Analysis fields. The table scrolls horizontally when all editable
-properties do not fit.
 
 ## Desktop
 
@@ -52,8 +40,6 @@ Default columns:
 - Status
 - State
 - Next review
-
-State, Status, and due date are editable directly in the table.
 
 The primary cell shows only the official problem name. Contest IDs and filenames
 are secondary metadata, never part of the title.
@@ -99,7 +85,6 @@ Heavy content loads only when the drawer opens.
 - Bottom navigation for Today, Problems, Views, and Settings
 - Full-screen statement/details surface
 - Full-screen progressive review surface
-- Sprint selection and focused mashup surface
 
 Do not copy the tall ReSync mobile sidebar. Mobile should reach due problems
 immediately.

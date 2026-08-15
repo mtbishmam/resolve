@@ -24,12 +24,6 @@ number of systems and keeps the web app, MCP, and database in one deployment.
 D1 export and provider-independent JSON/Markdown exports remain required to
 avoid lock-in.
 
-Sprint membership stays on `problems` because it is a single active monthly
-milestone assignment. Focused mashup sessions received their own table because
-ordered membership, resumable status, backdated global time, and independent
-per-problem elapsed counters are one immediate integrity unit and must survive
-navigation or device refreshes.
-
 ## AI boundary
 
 A standalone ChatGPT/OpenAI API interviewer was rejected for the MVP. Codex

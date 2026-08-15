@@ -17,7 +17,6 @@ const UpdateSchema = z
     status: ProblemStatusSchema.nullable().optional(),
     archived: z.boolean().optional(),
     dueDate: z.string().date().nullable().optional(),
-    sprintId: z.string().min(1).nullable().optional(),
     nextReviewDate: z.string().date().nullable().optional(),
     officialTags: z.array(z.string().min(1).max(80)).max(100).optional(),
   })
