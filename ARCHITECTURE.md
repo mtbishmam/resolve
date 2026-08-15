@@ -4,7 +4,7 @@ The private hosted D1 database is the durable cross-device source of truth.
 IndexedDB holds only the compact problem index for cache-first rendering; the
 app refreshes it asynchronously and lazy-loads heavy details. There is no
 fabricated offline write queue or conflict resolver. JSON/SQL exports include
-problems, reflections, reviews, saved views, and sprints.
+problems, reflections, reviews, saved views, sprints, and mashups.
 
 ## System boundary
 
@@ -67,6 +67,10 @@ Keep the tool surface small and outcome-oriented:
 - `get_problem`
 - `list_due_reviews`
 - `record_review`
+- `record_mashup_result`
+- `update_problem`
+- `update_reflection`
+- `list_sprints`
 
 `save_reflection` validates canonical identity, detects duplicates, stores the
 statement and reflection, derives difficulty from a numeric rating or validates
@@ -74,12 +78,45 @@ the adaptive difficulty supplied for an unrated problem, creates the first
 review schedule, and returns the saved identifiers and due date in one
 transaction.
 
+### Reflection output contract
+
+The persisted reflection keeps three kinds of content separate:
+
+- `summary_markdown` is the objective problem summary: input, task, condition,
+  and output, with story and personal reasoning removed.
+- `structured_summary_json` is the metacognitive analysis of how the user
+  reasoned, including approaches, mistakes, failure, breakthrough, and future
+  triggers.
+- `transcript_messages_json` preserves the exact ordered interview, while
+  `memory_cue` stores the shortest separate recall trigger.
+
+This separation is part of the save contract. A reflection is not ready to save
+if the problem summary contains first-person reasoning or commentary about the
+user's solution process.
+
 Supported MCP problem platforms are Codeforces, CSES, and AtCoder. AtCoder
 identity uses the task slug from `/contests/{contest}/tasks/{task}` as the
 problem key.
 
 `record_review` appends review history and updates the next-review projection in
 one transaction.
+
+`record_mashup_result` verifies that `problem_id` is already in the indicated
+`mashup_id`, then updates only that mashup's notes JSON. It never upserts a
+problem and is the correct tool for a ChatGPT conversation started from a
+copied mashup packet.
+
+`list_sprints` lets the model discover stable Sprint IDs. `get_problem`
+followed by `update_problem` is the MCP path for attaching a problem that is
+already in the library. `save_reflection` handles the more common case: when
+canonical identity already exists, it adds the new reflection and applies the
+explicit State and Status while preserving Sprint membership and due date.
+
+The server advertises workflow instructions and read/write annotations during
+MCP initialization. Local Codex clients may use the configured bearer token;
+the hosted ChatGPT surface may use its authenticated ChatGPT session. A generic
+third-party ChatGPT MCP connection must use MCP OAuth 2.1 rather than a custom
+API-key field.
 
 MCP writes require authentication. The extension never receives the MCP token
 or database credentials.

@@ -1,17 +1,20 @@
 import {
   getProblemByIdentity,
   listDueReviews,
+  listSprints,
+  recordMashupResult,
   recordReview,
   saveReflection,
   updateProblemProperties,
   updateReflection,
 } from "@/db/queries";
-import { getMcpToken } from "@/db/index";
+import { authorizeBrowserRequest } from "@/lib/auth";
 import {
   DifficultySchema,
   ProblemStateSchema,
   ProblemStatusSchema,
   RecordReviewSchema,
+  RecordMashupResultSchema,
   SaveReflectionSchema,
   UpdateReflectionSchema,
 } from "@/lib/contracts";
@@ -28,9 +31,16 @@ type RpcRequest = {
 
 const tools = [
   {
+    name: "list_sprints",
+    description:
+      "List monthly milestones and their configured date ranges and targets.",
+    inputSchema: { type: "object", properties: {} },
+    annotations: { readOnlyHint: true, destructiveHint: false },
+  },
+  {
     name: "save_reflection",
     description:
-      "Atomically and idempotently save a canonical problem and exact ordered reflection transcript. Numeric ratings derive difficulty automatically; unrated problems require an adaptive easy, medium, hard, or extreme difficulty.",
+      "Atomically and idempotently save a canonical problem and exact ordered reflection transcript. If the canonical problem already exists in a sprint, preserve its sprint and due date while applying the supplied State and Status. Numeric ratings derive difficulty automatically; unrated problems require an adaptive difficulty.",
     inputSchema: {
       type: "object",
       required: ["idempotency_key", "problem", "reflection"],
@@ -82,6 +92,7 @@ const tools = [
         reflection: { type: "object" },
       },
     },
+    annotations: { destructiveHint: false, idempotentHint: true },
   },
   {
     name: "get_problem",
@@ -95,6 +106,7 @@ const tools = [
         problem_key: { type: "string" },
       },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false },
   },
   {
     name: "list_due_reviews",
@@ -104,6 +116,7 @@ const tools = [
       required: ["date"],
       properties: { date: { type: "string", format: "date" } },
     },
+    annotations: { readOnlyHint: true, destructiveHint: false },
   },
   {
     name: "record_review",
@@ -114,7 +127,6 @@ const tools = [
       required: [
         "idempotency_key",
         "problem_id",
-        "reflection_id",
         "due_date",
         "outcome",
         "deepest_reveal",
@@ -122,7 +134,7 @@ const tools = [
       properties: {
         idempotency_key: { type: "string" },
         problem_id: { type: "string" },
-        reflection_id: { type: "string" },
+        reflection_id: { type: ["string", "null"] },
         due_date: { type: "string", format: "date" },
         outcome: {
           enum: ["recalled", "needed_cue", "forgot", "unresolved"],
@@ -142,6 +154,24 @@ const tools = [
         timer_elapsed_seconds: { type: "integer", minimum: 0 },
       },
     },
+    annotations: { destructiveHint: false, idempotentHint: true },
+  },
+  {
+    name: "record_mashup_result",
+    description:
+      "Write approaches, lemmas, and analysis for a problem already included in an existing mashup. This verifies membership and never creates or duplicates a problem row.",
+    inputSchema: {
+      type: "object",
+      required: ["mashup_id", "problem_id"],
+      properties: {
+        mashup_id: { type: "string" },
+        problem_id: { type: "string" },
+        approaches: { type: "string" },
+        lemmas: { type: "string" },
+        analysis: { type: "string" },
+      },
+    },
+    annotations: { destructiveHint: false, idempotentHint: true },
   },
   {
     name: "update_problem",
@@ -167,10 +197,12 @@ const tools = [
         },
         archived: { type: "boolean" },
         due_date: { type: ["string", "null"], format: "date" },
+        sprint_id: { type: ["string", "null"] },
         next_review_date: { type: ["string", "null"], format: "date" },
         official_tags: { type: "array", items: { type: "string" } },
       },
     },
+    annotations: { destructiveHint: false, idempotentHint: true },
   },
   {
     name: "update_reflection",
@@ -187,6 +219,7 @@ const tools = [
         confidence: { type: ["number", "null"], minimum: 0, maximum: 5 },
       },
     },
+    annotations: { destructiveHint: false, idempotentHint: true },
   },
 ];
 
@@ -198,6 +231,7 @@ const McpProblemUpdateSchema = z.object({
   status: ProblemStatusSchema.nullable().optional(),
   archived: z.boolean().optional(),
   due_date: z.string().date().nullable().optional(),
+  sprint_id: z.string().min(1).nullable().optional(),
   next_review_date: z.string().date().nullable().optional(),
   official_tags: z.array(z.string()).optional(),
 });
@@ -220,15 +254,7 @@ function rpcError(
 }
 
 async function authorized(request: Request) {
-  const bearer = request.headers.get("authorization");
-  const configured = await getMcpToken();
-  const hostname = new URL(request.url).hostname;
-  const expected =
-    configured ??
-    (hostname === "localhost" || hostname === "127.0.0.1"
-      ? "resolve-local-mcp-token"
-      : null);
-  return expected !== null && bearer === `Bearer ${expected}`;
+  return authorizeBrowserRequest(request);
 }
 
 export async function POST(request: Request) {
@@ -250,6 +276,8 @@ export async function POST(request: Request) {
         protocolVersion: "2025-06-18",
         capabilities: { tools: { listChanged: false } },
         serverInfo: { name: "resolve", version: "0.1.0" },
+        instructions:
+          "ReSolve is a private competitive-programming learning system. Use canonical (platform, problem_key) identity. For a problem already present in a sprint, get it first; saving a reflection updates that canonical row and preserves sprint_id and due_date. For mashup approaches, lemmas, and analysis, call record_mashup_result with the existing mashup_id and problem_id; it never creates a problem. Retry is an unsolved reattempt, Revise is a speed re-solve, and Resolve is uncertain reconstruction. Never claim a write succeeded unless the tool result confirms it.",
       });
     }
     if (payload.method === "notifications/initialized") {
@@ -276,8 +304,12 @@ export async function POST(request: Request) {
           throw new Error("date must use YYYY-MM-DD");
         }
         result = await listDueReviews(date);
+      } else if (name === "list_sprints") {
+        result = await listSprints();
       } else if (name === "record_review") {
         result = await recordReview(RecordReviewSchema.parse(args));
+      } else if (name === "record_mashup_result") {
+        result = await recordMashupResult(RecordMashupResultSchema.parse(args));
       } else if (name === "update_problem") {
         const input = McpProblemUpdateSchema.parse(args);
         result = {
@@ -288,6 +320,7 @@ export async function POST(request: Request) {
             status: input.status,
             archived: input.archived,
             dueDate: input.due_date,
+            sprintId: input.sprint_id,
             nextReviewDate: input.next_review_date,
             officialTags: input.official_tags,
           }),

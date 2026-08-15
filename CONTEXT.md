@@ -40,6 +40,26 @@ Extreme speed is the number-one product requirement.
 12. When due, **Start review** begins progressive active recall and records the
     outcome and next review date.
 
+### Sprint problem flow
+
+1. Open **August Sprint** from the sidebar.
+2. Work through CP31 in rating order: 1600 on August 5–11, 1700 on August
+   12–18, 1800 on August 19–25, and 1900 on August 26–September 1.
+3. Select any problems across any views and create a focused mashup. Choose a
+   five-hour duration and, when needed, a start time earlier than now.
+4. Solve from the stored statement tabs. ReSolve keeps the global and active-tab
+   timers plus Approaches, Lemmas, and Analysis, and saves them in the
+   background.
+5. When a Sprint problem is later captured and reflected through Codex,
+   `save_reflection` recognizes its canonical identity, keeps its Sprint due
+   date, adds the reflection, and applies the explicitly supplied State and
+   Status.
+6. If only workflow properties need changing, use `get_problem` and then
+   `update_problem`; no duplicate problem is created.
+7. Open Profile → Mashups for dated results. A copied result packet is written
+   back through `record_mashup_result`, which requires the existing mashup and
+   problem IDs and never creates a new problem.
+
 ## Firm decisions
 
 - The product name is **ReSolve**.
@@ -67,6 +87,11 @@ Extreme speed is the number-one product requirement.
 - Archiving preserves Status and State instead of acting as another Status.
 - Pending AC is a saved view, not a special tag.
 - Raw interviews are append-only and must never be replaced by a summary.
+- `summary_markdown` is an objective problem-only summary: what is given, what
+  must be found or computed, the condition, and the output. It must not contain
+  the user's approach, mistakes, stuck point, breakthrough, algorithm choice,
+  or other metacognitive commentary. Those belong in the structured reflection
+  and the raw transcript.
 - Generated classifications may be regenerated later.
 
 ## Success

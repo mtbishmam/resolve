@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CaptureSchema,
+  CreateMashupSchema,
+  RecordMashupResultSchema,
+  RecordReviewSchema,
   SaveReflectionSchema,
   TranscriptMessageSchema,
 } from "@/lib/contracts";
@@ -202,5 +205,46 @@ describe("reflection difficulty contract", () => {
     });
     expect(parsed.problem.platform).toBe("atcoder");
     expect(parsed.problem.difficulty).toBe("medium");
+  });
+});
+
+describe("mashup contract", () => {
+  it("accepts a backdated five-hour focused session", () => {
+    const parsed = CreateMashupSchema.parse({
+      sprint_id: "sprint-2026-08",
+      problem_ids: ["problem-a", "problem-b"],
+      duration_seconds: 5 * 60 * 60,
+      started_at: "2026-08-04T00:00:00.000Z",
+    });
+    expect(parsed.problem_ids).toHaveLength(2);
+    expect(parsed.duration_seconds).toBe(18_000);
+  });
+
+  it("accepts notes for an existing mashup problem", () => {
+    const parsed = RecordMashupResultSchema.parse({
+      mashup_id: "mashup-a",
+      problem_id: "problem-a",
+      approaches: "Binary search on the answer",
+      lemmas: "Feasibility is monotone",
+      analysis: "O(n log n)",
+    });
+    expect(parsed.problem_id).toBe("problem-a");
+  });
+});
+
+describe("review contract", () => {
+  it("records a timed Retry before a reflection exists", () => {
+    const parsed = RecordReviewSchema.parse({
+      idempotency_key: "retry-without-reflection",
+      problem_id: "problem-a",
+      reflection_id: null,
+      due_date: "2026-08-05",
+      outcome: "unresolved",
+      deepest_reveal: "none",
+      timer_limit_seconds: 1800,
+      timer_elapsed_seconds: 1811,
+    });
+    expect(parsed.reflection_id).toBeNull();
+    expect(parsed.timer_elapsed_seconds).toBe(1811);
   });
 });

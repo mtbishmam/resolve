@@ -97,9 +97,9 @@ export const reviews = sqliteTable(
     problemId: text("problem_id")
       .notNull()
       .references(() => problems.id, { onDelete: "cascade" }),
-    reflectionId: text("reflection_id")
-      .notNull()
-      .references(() => reflections.id, { onDelete: "cascade" }),
+    reflectionId: text("reflection_id").references(() => reflections.id, {
+      onDelete: "cascade",
+    }),
     dueDate: text("due_date").notNull(),
     reviewedAt: text("reviewed_at"),
     outcome: text("outcome"),
@@ -146,4 +146,30 @@ export const sprints = sqliteTable(
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [uniqueIndex("sprints_month_unique").on(table.month)],
+);
+
+export const mashups = sqliteTable(
+  "mashups",
+  {
+    id: text("id").primaryKey(),
+    sprintId: text("sprint_id").references(() => sprints.id, {
+      onDelete: "set null",
+    }),
+    problemIdsJson: text("problem_ids_json").notNull().default("[]"),
+    activeProblemId: text("active_problem_id"),
+    elapsedByProblemJson: text("elapsed_by_problem_json")
+      .notNull()
+      .default("{}"),
+    notesByProblemJson: text("notes_by_problem_json").notNull().default("{}"),
+    durationSeconds: integer("duration_seconds").notNull(),
+    startedAt: text("started_at").notNull(),
+    endedAt: text("ended_at"),
+    status: text("status").notNull().default("active"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [
+    index("mashups_sprint_created_idx").on(table.sprintId, table.createdAt),
+    index("mashups_status_updated_idx").on(table.status, table.updatedAt),
+  ],
 );

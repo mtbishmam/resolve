@@ -2,6 +2,7 @@ import { authorizeBrowserRequest } from "@/lib/auth";
 import {
   getProblemById,
   listProblems,
+  listMashups,
   listSavedViews,
   listSprints,
 } from "@/db/queries";
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
           problems: details,
           savedViews: await listSavedViews(),
           sprints: await listSprints(),
+          mashups: await listMashups(),
         },
         null,
         2,
@@ -72,6 +74,7 @@ export async function GET(request: Request) {
       "reviews",
       "saved_views",
       "sprints",
+      "mashups",
     ];
     const output: string[] = [
       "-- ReSolve provider-independent data export",

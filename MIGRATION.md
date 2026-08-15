@@ -14,6 +14,22 @@ marked as such, and no historical review events were fabricated.
 
 All other Notion problem rows remain unimported.
 
+## August CP31 Sprint
+
+The CP31 Sprint is a separate, explicitly authorized import from
+`/Users/mtbishmam/code/cp-problem-exporter/lists/cp31`, not a Notion migration.
+`data/cp31-august-2026.json` contains the reproducible 124-problem snapshot.
+`drizzle/0004_sprint_mashups.sql` creates the Sprint/mashup schema and the
+following numbered CP31 batch migrations apply the canonical upserts without
+exceeding D1 statement-size limits.
+
+The migration matches `(platform, problem_key)`. New canonical rows start as
+Backlog with no State. Existing rows keep Status, State, archive timestamp,
+review schedule, reflections, reviews, and any richer metadata or statement;
+only August Sprint membership and the generated due date are assigned. The
+generator is `scripts/generate-cp31-sprint-sql.mjs` and can be checked with
+`npm run data:sprint`.
+
 The source directory remains intact at `/Users/mtbishmam/code/cp-app` as a
 recoverable reference. It should not be deleted until ReSolve implementation
 and repository setup are verified.

@@ -19,9 +19,10 @@
     "identity:check": "node scripts/check-identity.mjs",
     "test:all": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run test:db && npm run identity:check && npm run extension:build && npm run build",
     "db:generate": "drizzle-kit generate",
-    "db:migrate:local": "wrangler d1 execute resolve-local --config wrangler.local.jsonc --local --persist-to .wrangler/state --file drizzle/0000_resolve_mvp.sql",
+    "db:migrate:local": "wrangler d1 migrations apply resolve-local --config wrangler.local.jsonc --local --persist-to .wrangler/state",
     "db:seed:local": "wrangler d1 execute resolve-local --config wrangler.local.jsonc --local --persist-to .wrangler/state --file drizzle/0001_showcase.sql",
     "data:refresh": "node scripts/build-showcase-data.mjs && node scripts/generate-showcase-sql.mjs",
+    "data:sprint": "node scripts/generate-cp31-sprint-sql.mjs",
     "export:local": "node scripts/export-local.mjs",
     "extension:build": "node extension/build.mjs",
     "extension:package": "node scripts/package-extension.mjs"
