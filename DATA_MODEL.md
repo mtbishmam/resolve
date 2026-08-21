@@ -55,7 +55,8 @@ Constraints:
 
 - Unique `(platform, problem_key)`
 - Supported platforms are `codeforces`, `cses`, `atcoder`, `codechef`, and
-  `lightoj`.
+  `lightoj`. Codeforces Gym problems remain `codeforces` rows, use
+  `{gym_id}:{index}` as `problem_key`, and preserve their `/gym/` URL.
 - AtCoder uses the task slug as `problem_key`, for example `abc446_d`; the
   source filename is derived separately as `abc446_d.cpp`.
 - CodeChef uses the uppercase problem code; LightOJ uses the lowercase problem

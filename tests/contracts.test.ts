@@ -23,6 +23,7 @@ describe("canonical problem identity", () => {
       "codeforces",
       "1554:B",
     ],
+    ["https://codeforces.com/gym/106644/problem/K", "codeforces", "106644:K"],
     ["https://cses.fi/problemset/task/1668/", "cses", "1668"],
     [
       "https://atcoder.jp/contests/abc446/tasks/abc446_d?lang=en",
@@ -44,6 +45,14 @@ describe("canonical problem identity", () => {
     expect(normalizeProblemUrl(url)).toMatchObject({ platform, problemKey });
   });
 
+  it("preserves the Codeforces Gym route in the canonical URL", () => {
+    expect(
+      normalizeProblemUrl(
+        "https://codeforces.com/gym/106644/problem/k?locale=en",
+      ).canonicalUrl,
+    ).toBe("https://codeforces.com/gym/106644/problem/K");
+  });
+
   it("rejects CSES result URLs because the result id is not a problem id", () => {
     expect(() =>
       normalizeProblemUrl("https://cses.fi/problemset/result/14841190/"),
@@ -58,6 +67,13 @@ describe("canonical problem identity", () => {
         title: "Cobb",
       }),
     ).toBe("1554B.cpp");
+    expect(
+      expectedSourceFilename({
+        platform: "codeforces",
+        problemKey: "106644:K",
+        title: "Kuusi Seitsemän",
+      }),
+    ).toBe("106644K.cpp");
     expect(
       expectedSourceFilename({
         platform: "cses",

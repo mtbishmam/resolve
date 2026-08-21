@@ -7,16 +7,17 @@ function captureCodeforcesProblem() {
 
   function canonicalIdentity() {
     const match = location.pathname.match(
-      /\/(?:contest\/(\d+)\/problem|problemset\/problem\/(\d+))\/([A-Za-z0-9]+)/,
+      /\/(?:(contest|gym)\/(\d+)\/problem|problemset\/problem\/(\d+))\/([A-Za-z0-9]+)/,
     );
     if (!match) throw new Error("Open a Codeforces problem page first.");
-    const contest = Number(match[1] ?? match[2]);
-    const index = match[3].toUpperCase();
+    const route = match[1] === "gym" ? "gym" : "contest";
+    const contest = Number(match[2] ?? match[3]);
+    const index = match[4].toUpperCase();
     return {
       contest,
       index,
       key: `${contest}:${index}`,
-      url: `https://codeforces.com/contest/${contest}/problem/${index}`,
+      url: `https://codeforces.com/${route}/${contest}/problem/${index}`,
     };
   }
 

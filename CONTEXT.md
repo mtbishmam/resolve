@@ -18,7 +18,8 @@ Extreme speed is the number-one product requirement.
 ## Approved workflow
 
 1. Solve a problem.
-2. Send a canonical Codeforces, AtCoder, CSES, CodeChef, or LightOJ problem URL,
+2. Send a canonical Codeforces (including Gym), AtCoder, CSES, CodeChef, or
+   LightOJ problem URL,
    or paste the problem statement. A URL remains the fastest and most
    token-efficient input, but a paste begins coaching immediately.
 3. Codex reads the official page, validates `(platform, problem_key)`, and
@@ -52,7 +53,8 @@ its statement through `update_problem`. This content refresh never creates a
 second problem or alters Status, State, Sprint membership, due dates,
 reflections, or reviews unless those properties are explicitly supplied.
 
-Codeforces, CSES, AtCoder, CodeChef, and LightOJ share the durable MCP path.
+Codeforces, including Gym problems, CSES, AtCoder, CodeChef, and LightOJ share
+the durable MCP path.
 Public judges outside that persisted enum may still use coach mode and the
 pending-draft workflow; `PLATFORM_SOURCES.md` records the boundary.
 

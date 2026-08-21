@@ -6,17 +6,18 @@ export function normalizeProblemUrl(value: string) {
 
   if (host === "codeforces.com" || host === "m1.codeforces.com") {
     const match = url.pathname.match(
-      /\/(?:contest\/(\d+)\/problem|problemset\/problem\/(\d+))\/([A-Za-z0-9]+)/,
+      /\/(?:(contest|gym)\/(\d+)\/problem|problemset\/problem\/(\d+))\/([A-Za-z0-9]+)/,
     );
     if (!match) throw new Error("Unsupported Codeforces problem URL");
-    const contest = match[1] ?? match[2];
-    const index = match[3].toUpperCase();
+    const route = match[1] === "gym" ? "gym" : "contest";
+    const contest = match[2] ?? match[3];
+    const index = match[4].toUpperCase();
     return {
       platform: PlatformSchema.parse("codeforces"),
       problemKey: `${contest}:${index}`,
       contest,
       index,
-      canonicalUrl: `https://codeforces.com/contest/${contest}/problem/${index}`,
+      canonicalUrl: `https://codeforces.com/${route}/${contest}/problem/${index}`,
     };
   }
 

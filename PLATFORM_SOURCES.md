@@ -27,18 +27,40 @@ input/output in separate fenced `text` blocks.
 
 ## Platform registry
 
-| Platform   | URL coaching | ReSolve persistence | Canonical key                             | Important extraction notes                                                                                   |
-| ---------- | ------------ | ------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Codeforces | Yes          | Yes                 | `{contest}:{index}`, such as `1899:C`     | Preserve MathJax TeX and sample `<pre>` newlines; keep official tags hidden during initial reasoning.        |
-| CSES       | Yes          | Yes                 | Numeric task ID                           | Use the official title; preserve statement sections and samples.                                             |
-| AtCoder    | Yes          | Yes                 | Task slug, such as `abc446_d`             | Select the English statement, not the duplicated Japanese section; preserve TeX and every sample separately. |
-| CodeChef   | Yes          | Yes                 | Uppercase problem code, such as `FLOW001` | Accept canonical and contest-scoped problem URLs; unrated problems use adaptive difficulty.                  |
-| LightOJ    | Yes          | Yes                 | Lowercase problem slug                    | Preserve diagrams and reconstruct sample tables as separate multiline input/output blocks.                   |
+| Platform   | URL coaching | ReSolve persistence | Canonical key                             | Important extraction notes                                                                                                                                      |
+| ---------- | ------------ | ------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Codeforces | Yes          | Yes                 | `{contest}:{index}`, such as `1899:C`     | Accept contest, problemset, and Gym URLs. Preserve the Gym route, MathJax TeX, and sample `<pre>` newlines; keep official tags hidden during initial reasoning. |
+| CSES       | Yes          | Yes                 | Numeric task ID                           | Use the official title; preserve statement sections and samples.                                                                                                |
+| AtCoder    | Yes          | Yes                 | Task slug, such as `abc446_d`             | Select the English statement, not the duplicated Japanese section; preserve TeX and every sample separately.                                                    |
+| CodeChef   | Yes          | Yes                 | Uppercase problem code, such as `FLOW001` | Accept canonical and contest-scoped problem URLs; unrated problems use adaptive difficulty.                                                                     |
+| LightOJ    | Yes          | Yes                 | Lowercase problem slug                    | Preserve diagrams and reconstruct sample tables as separate multiline input/output blocks.                                                                      |
 
 “URL coaching” means Codex can read the page, enter coach mode, discuss the
 problem, inspect an optional local solution, and keep an unsaved pending draft.
 “ReSolve persistence” means the MCP can save the problem into the durable
 database and make every review/mashup feature available.
+
+## Codeforces Gym
+
+Accepted Gym problem URL form:
+
+```text
+https://codeforces.com/gym/{gym_id}/problem/{INDEX}
+```
+
+Gym problems use the existing `codeforces` platform and the same persistent
+key as ordinary Codeforces problems:
+
+```text
+platform: codeforces
+problem_key: {gym_id}:{UPPERCASE_INDEX}
+```
+
+The canonical URL keeps `/gym/` rather than being rewritten to `/contest/`.
+Capture, reflection, review, sprint, mashup, export, and source lookup behavior
+is otherwise identical to an ordinary Codeforces problem. Gym problems are
+commonly unrated, so they receive adaptive difficulty during reflection when no
+numeric rating is available.
 
 ## LightOJ
 

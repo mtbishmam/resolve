@@ -24,7 +24,7 @@ Production: <https://resolve.mtbishmam.chatgpt.site>
 - Codex conducts adaptive reflections and writes through authenticated MCP.
 - The web app provides a cache-first problem database, stored statement reader,
   saved views, editing, review history, and a progressive no-AI review flow.
-- A canonical Codeforces, AtCoder, CSES, CodeChef, or LightOJ URL is the
+- A canonical Codeforces (including Gym), AtCoder, CSES, CodeChef, or LightOJ URL is the
   fastest input; a pasted statement can start coaching immediately, with
   canonical identity resolved before MCP persistence.
 - The Manifest V3 extension is an optional Codeforces snapshot fallback.

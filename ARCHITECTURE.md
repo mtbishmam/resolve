@@ -99,8 +99,9 @@ This separation is part of the save contract. A reflection is not ready to save
 if the problem summary contains first-person reasoning or commentary about the
 user's solution process.
 
-Supported MCP problem platforms are Codeforces, CSES, AtCoder, CodeChef, and
-LightOJ. AtCoder identity uses the task slug from
+Supported MCP problem platforms are Codeforces (including Gym), CSES, AtCoder,
+CodeChef, and LightOJ. Codeforces Gym uses the existing `codeforces` platform,
+`{gym_id}:{index}` key, and preserved `/gym/` URL. AtCoder identity uses the task slug from
 `/contests/{contest}/tasks/{task}`; CodeChef uses the uppercase problem code;
 LightOJ uses the lowercase problem slug.
 

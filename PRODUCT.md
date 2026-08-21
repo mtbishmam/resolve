@@ -62,8 +62,8 @@ actions.
 
 ## URL ingestion, capture, and reflection
 
-The default input is a canonical Codeforces, AtCoder, CSES, CodeChef, or
-LightOJ problem URL. Codex retrieves the official English statement and
+The default input is a canonical Codeforces (including Gym), AtCoder, CSES,
+CodeChef, or LightOJ problem URL. Codex retrieves the official English statement and
 normalizes identity, metadata, TeX, sample blocks, and external image links. A
 clean pasted statement can start coaching immediately. Before persistence,
 Codex resolves its identity from pasted page metadata or asks once for the
@@ -73,6 +73,10 @@ The optional Codeforces browser extension performs deterministic extraction
 and preserves an exact recoverable page snapshot. It does not use AI, hold
 database credentials, or write directly to ReSolve. It is not required for
 reflection, review, Sprint, mashup, or export functionality.
+
+Codeforces Gym URLs use the same durable platform, identity, capture,
+reflection, review, and export workflow as ordinary Codeforces problems while
+preserving their `/gym/` canonical URL.
 
 Other public judges may be discussion sources before they become persisted
 platforms. The adapter registry in `PLATFORM_SOURCES.md` is authoritative for
