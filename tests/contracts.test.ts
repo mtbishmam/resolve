@@ -118,6 +118,27 @@ describe("capture safety", () => {
     expect(sanitized).toContain("https://codeforces.com/images/a.png");
   });
 
+  it("canonicalizes escaped Markdown and MathJax before persistence", () => {
+    const fence = "\\`\\`\\`";
+    const input = [
+      String.raw`Inline \(A_i\) and display \[\sum_{i=1}^{9} A_i\].`,
+      "",
+      fence,
+      "T",
+      fence,
+    ].join("\n");
+    const sanitized = sanitizeStatementMarkdown(
+      input,
+      "https://atcoder.jp/contests/arc211/tasks/arc211_a",
+    );
+
+    expect(sanitized).toContain("$A_i$");
+    expect(sanitized).toContain("$$\\sum_{i=1}^{9} A_i$$");
+    expect(sanitized).toContain("```\nT\n```");
+    expect(sanitized).not.toContain("\\(");
+    expect(sanitized).not.toContain("\\`");
+  });
+
   it("validates resolve.capture.v1", () => {
     const value = {
       schema: "resolve.capture.v1",

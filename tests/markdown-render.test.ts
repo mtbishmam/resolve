@@ -34,6 +34,27 @@ describe("statement rendering", () => {
     ).toBe("Split into (n)/(k) parts, where 1 ≤ k ≤ 2·10^5 and x mod m = 0.");
   });
 
+  it("normalizes MathJax delimiters and escaped Markdown fences", () => {
+    const statement = [
+      String.raw`Inline \(A_i\) and display \[\sum_{i=1}^{9} A_i\].`,
+      "",
+      "\\`\\`\\`",
+      "T",
+      "\\`\\`\\`",
+    ].join("\n");
+    const normalized = normalizeStatementText(statement);
+
+    expect(normalized).toContain("$A_i$");
+    expect(normalized).toContain("$$\\sum_{i=1}^{9} A_i$$");
+    expect(normalized).toContain("```\nT\n```");
+
+    const html = renderToStaticMarkup(
+      createElement(Markdown, { statement: true }, statement),
+    );
+    expect(html).toContain('class="katex"');
+    expect(html).toContain("<pre>");
+  });
+
   it("renders symbolic input formats as math while preserving real samples", () => {
     const statement = [
       "## Input",
@@ -60,5 +81,37 @@ describe("statement rendering", () => {
     );
     expect(html).toContain("katex-display");
     expect(html).toContain("<pre>");
+  });
+
+  it("keeps example input and output left-alignable with independent copy buttons", () => {
+    const statement = [
+      "## Example",
+      "",
+      "### Input",
+      "",
+      "```text",
+      "2",
+      "67C",
+      "C76",
+      "```",
+      "",
+      "### Output",
+      "",
+      "```text",
+      "1",
+      "0",
+      "```",
+    ].join("\n");
+    const normalized = normalizeSymbolicInputBlocks(statement);
+    expect(normalized).not.toContain("\\begin{gathered}");
+    expect(normalized).toContain("```text\n2\n67C\nC76\n```");
+
+    const html = renderToStaticMarkup(
+      createElement(Markdown, { statement: true }, statement),
+    );
+    expect(html.match(/data-code-block="true"/g)).toHaveLength(2);
+    expect(html.match(/aria-label="Copy code block"/g)).toHaveLength(2);
+    expect(html).toContain('<pre><code class="language-text">2\n67C\nC76');
+    expect(html).toContain('<pre><code class="language-text">1\n0');
   });
 });

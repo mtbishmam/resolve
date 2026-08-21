@@ -1,10 +1,12 @@
 "use client";
 
+import { isValidElement, useEffect, useState, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeKatex from "rehype-katex";
 import rehypeSanitize, { defaultSchema } from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
+import { normalizeCapturedMarkdown } from "@/lib/sanitize";
 
 const schema = {
   ...defaultSchema,
@@ -100,11 +102,17 @@ export function normalizeSymbolicInputBlocks(value: string) {
   const lines = value.split("\n");
   const output: string[] = [];
   let section = "";
+  const headingStack: string[] = [];
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index];
     const heading = line.match(/^#{1,6}\s+(.+?)\s*$/);
-    if (heading) section = heading[1].trim().toLowerCase();
+    if (heading) {
+      const level = line.match(/^#+/)?.[0].length ?? 1;
+      section = heading[1].trim().toLowerCase();
+      headingStack.length = level;
+      headingStack[level - 1] = section;
+    }
 
     const fence = line.match(/^```(?:text|plaintext)?\s*$/i);
     if (!fence) {
@@ -119,7 +127,11 @@ export function normalizeSymbolicInputBlocks(value: string) {
       end += 1;
     }
 
-    const isInputFormat = /^(?:input|input format)$/.test(section);
+    const isExampleBlock = headingStack.some((value) =>
+      /^(?:examples?|samples?)(?:\s|$)/.test(value ?? ""),
+    );
+    const isInputFormat =
+      /^(?:input|input format)$/.test(section) && !isExampleBlock;
     if (
       end < lines.length &&
       isInputFormat &&
@@ -149,8 +161,63 @@ export function normalizeSymbolicInputBlocks(value: string) {
   return output.join("\n");
 }
 
+function codeBlockText(node: ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") {
+    return String(node);
+  }
+  if (Array.isArray(node)) return node.map(codeBlockText).join("");
+  if (isValidElement<{ children?: ReactNode }>(node)) {
+    return codeBlockText(node.props.children);
+  }
+  return "";
+}
+
+function CodeBlock({ children }: { children?: ReactNode }) {
+  const [copyState, setCopyState] = useState<"idle" | "copied" | "error">(
+    "idle",
+  );
+  const value = codeBlockText(children).replace(/\n$/, "");
+
+  useEffect(() => {
+    if (copyState === "idle") return;
+    const timeout = window.setTimeout(() => setCopyState("idle"), 1800);
+    return () => window.clearTimeout(timeout);
+  }, [copyState]);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopyState("copied");
+    } catch {
+      setCopyState("error");
+    }
+  }
+
+  const label =
+    copyState === "copied"
+      ? "Copied"
+      : copyState === "error"
+        ? "Copy failed"
+        : "Copy";
+
+  return (
+    <div className="code-block" data-code-block="true">
+      <button
+        type="button"
+        className={`code-copy-button ${copyState}`}
+        onClick={copy}
+        aria-label="Copy code block"
+      >
+        <span className="code-copy-icon" aria-hidden="true" />
+        <span>{label}</span>
+      </button>
+      <pre>{children}</pre>
+    </div>
+  );
+}
+
 export function normalizeStatementText(value: string) {
-  return normalizeSymbolicInputBlocks(value)
+  return normalizeSymbolicInputBlocks(normalizeCapturedMarkdown(value))
     .split(/(```[\s\S]*?```|`[^`]*`|\$\$[\s\S]*?\$\$|\$[^$\n]*\$)/g)
     .map((part) => {
       if (/^(`|\$)/.test(part)) return part;
@@ -182,6 +249,7 @@ export default function Markdown({
         rehypePlugins={[[rehypeSanitize, schema], rehypeKatex]}
         components={{
           a: (props) => <a {...props} target="_blank" rel="noreferrer" />,
+          pre: ({ children }) => <CodeBlock>{children}</CodeBlock>,
           img: ({ src, alt }) => (
             <figure>
               {/* eslint-disable-next-line @next/next/no-img-element */}

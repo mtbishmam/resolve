@@ -1208,15 +1208,107 @@ button.primary,
   padding-left: 20px;
 }
 
-.markdown pre {
-  overflow-x: auto;
-  padding: 12px;
+.markdown .code-block {
+  position: relative;
+  overflow: hidden;
+  margin: 0 0 16px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f6f7f5;
+}
+
+.markdown .code-block pre {
+  overflow-x: auto;
+  margin: 0;
+  padding: 38px 14px 14px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #37453f;
   font-family: var(--font-mono), monospace;
   font-size: 9px;
   line-height: 1.5;
+  text-align: left;
+  white-space: pre;
+}
+
+.code-copy-button {
+  position: absolute;
+  z-index: 1;
+  top: 7px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 24px;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--faint);
+  font-family: var(--font-geist), sans-serif;
+  font-size: 8px;
+  font-weight: 650;
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.code-copy-button:hover,
+.code-copy-button:focus-visible {
+  background: #e8ece8;
+  color: var(--ink);
+  outline: none;
+}
+
+.code-copy-button.copied {
+  color: var(--forest);
+}
+
+.code-copy-button.error {
+  color: #9c3f36;
+}
+
+.code-copy-icon {
+  position: relative;
+  width: 11px;
+  height: 11px;
+}
+
+.code-copy-icon::before,
+.code-copy-icon::after {
+  position: absolute;
+  width: 6px;
+  height: 7px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  content: "";
+}
+
+.code-copy-icon::before {
+  top: 1px;
+  left: 1px;
+}
+
+.code-copy-icon::after {
+  right: 1px;
+  bottom: 1px;
+  background: #f6f7f5;
+}
+
+.code-copy-button.copied .code-copy-icon::before {
+  top: 4px;
+  left: 1px;
+  width: 3px;
+  height: 6px;
+  border-width: 0 1.5px 1.5px 0;
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+.code-copy-button.copied .code-copy-icon::after {
+  display: none;
 }
 
 .markdown code {
