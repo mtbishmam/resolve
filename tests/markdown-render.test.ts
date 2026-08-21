@@ -83,6 +83,38 @@ describe("statement rendering", () => {
     expect(html).toContain("<pre>");
   });
 
+  it("renders indexed case schematics and vertical dots as math", () => {
+    const statement = [
+      "## Input",
+      "",
+      "```text",
+      "T",
+      "case_1",
+      "case_2",
+      "\\vdots",
+      "case_T",
+      "```",
+    ].join("\n");
+    const normalized = normalizeSymbolicInputBlocks(statement);
+
+    expect(normalized).toContain("\\begin{gathered}");
+    expect(normalized).toContain("case_1");
+    expect(normalized).toContain("\\vdots");
+    expect(normalized).not.toContain("```text");
+
+    const html = renderToStaticMarkup(
+      createElement(Markdown, { statement: true }, statement),
+    );
+    expect(html).toContain("katex-display");
+    expect(html).toContain("⋮");
+  });
+
+  it("turns loose vertical-dot commands into the intended glyph", () => {
+    expect(normalizeStatementText(String.raw`Continue with \vdots here.`)).toBe(
+      "Continue with ⋮ here.",
+    );
+  });
+
   it("keeps example input and output left-alignable with independent copy buttons", () => {
     const statement = [
       "## Example",

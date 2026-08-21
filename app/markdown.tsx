@@ -27,6 +27,7 @@ const TEX_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\\ne(?![A-Za-z])/g, "≠"],
   [/\\equiv(?![A-Za-z])/g, "≡"],
   [/\\(?:dots|ldots|cdots)(?![A-Za-z])/g, "…"],
+  [/\\vdots(?![A-Za-z])/g, "⋮"],
   [/\\cdot(?![A-Za-z])/g, "·"],
   [/\\times(?![A-Za-z])/g, "×"],
   [/\\infty(?![A-Za-z])/g, "∞"],
@@ -82,6 +83,7 @@ function isSymbolicInputBlock(value: string) {
 
   const words = lines
     .join(" ")
+    .replace(/\b[A-Za-z][A-Za-z0-9]*_(?:\{[^{}\n]+\}|[A-Za-z0-9]+)\b/g, "x")
     .replace(/\\[A-Za-z]+/g, "")
     .replace(/\.\.\./g, "")
     .match(/[A-Za-z]+/g);
