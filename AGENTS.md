@@ -54,6 +54,48 @@ support is unclear. Codeforces, CSES, AtCoder, CodeChef, and LightOJ are
 persisted MCP platforms. A pasted statement starts coaching immediately; a
 canonical identity is required only before persistence.
 
+For every persisted judge URL capture, use the deterministic parser contract
+in `lib/statement-parser.ts` before persistence:
+
+- Run `normalizeStatementForPlatform(platform, markdown)`.
+- Build samples with `formatStatementSamples(platform, samples)` from explicit
+  input/output pairs.
+- Run `assertStructuredStatement(platform, markdown)` before `save_reflection`
+  or `update_problem`.
+- For Codeforces browser captures, use the DOM parser in
+  `extension/src/popup.ts` and its tested formatter in
+  `extension/src/codeforces-parser.ts`.
+- For AtCoder, keep only the English `Problem Statement` section. For LightOJ,
+  split the official two-column sample table before formatting. For CSES and
+  CodeChef, do not persist a prose extraction when sample input/output pairs
+  were not recovered.
+
+Never hand-reconstruct statement Markdown. If a capture cannot preserve
+separate sample input/output blocks, stop before persistence and recover the
+exact page capture instead.
+
+### Competitive-programming task titles
+
+Whenever the user pastes a supported judge problem link, rename the current
+Codex task after retrieving the canonical problem identifier and official
+problem name. Use exactly one space on each side of the hyphen:
+
+- Codeforces: `<contest_id><problem_index> - <official problem name>`, for
+  example `1899C - Yarik and Array`.
+- AtCoder: `<contest_id>_<task_id> - <official problem name>`, preserving the
+  canonical lowercase identifier, for example `abc446_d - Max Straight`.
+- CodeChef: `<problem_code> - <official problem name>`, preserving the
+  canonical uppercase code, for example
+  `PERMPAL - Permutation and Palindrome`.
+- LightOJ: `lightoj - <official problem name>` when the public URL exposes no
+  stable numeric problem identifier, for example `lightoj - Closest Distance`.
+- CSES: `cses<task_number> - <official problem name>`.
+
+Treat the canonical URL and official judge metadata as authoritative. If a
+user-supplied code conflicts with the URL or metadata, surface the ambiguity
+instead of silently choosing or rewriting it. Do not infer a missing CSES task
+number or any other unavailable identifier.
+
 ## Repository boundary
 
 This repository owns:
@@ -72,6 +114,22 @@ User-authored competitive-programming solutions remain in:
 Do not move or copy solution files into this repository. Read them only when
 the reflection or review workflow requires context and the user has placed that
 problem in scope.
+
+## Solution-check workflow
+
+Whenever the user asks to check, debug, simplify, or compare a competitive-
+programming solution, resolve the problem's canonical judge identifier first
+and inspect the matching user-authored file in:
+
+`/Users/mtbishmam/code/competitive-programming/practice`
+
+For Codeforces, the solution filename stem is exactly
+`<contest_id><problem_index>` with no separator. For example,
+`/Users/mtbishmam/code/competitive-programming/practice/2143A.cpp` is the
+solution for Codeforces contest 2143 problem A. Preserve and match the source
+file extension. Do not substitute a title-based filename or silently inspect
+an unrelated file. If the expected file is missing, report the exact path and
+ask the user to provide the file or confirm another filename.
 
 ## Reflection workflow
 

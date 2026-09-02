@@ -13,6 +13,10 @@ import { difficultyFromRating, type Difficulty } from "@/lib/difficulty";
 import { normalizeProblemUrl } from "@/lib/identity";
 import { nextReviewDate, SCHEDULE_VERSION } from "@/lib/schedule";
 import { sanitizeStatementMarkdown } from "@/lib/sanitize";
+import {
+  assertStructuredStatement,
+  normalizeStatementForPlatform,
+} from "@/lib/statement-parser";
 import type { ProblemState, ProblemStatus } from "@/lib/workflow";
 import { getD1 } from "./index";
 
@@ -204,10 +208,14 @@ export async function saveReflection(input: SaveReflectionInput) {
     .first<{ id: string }>();
   const problemId = existing?.id ?? crypto.randomUUID();
   const reflectionId = crypto.randomUUID();
-  const statement = sanitizeStatementMarkdown(
-    input.problem.statement_markdown,
-    input.problem.url,
+  const statement = normalizeStatementForPlatform(
+    input.problem.platform,
+    sanitizeStatementMarkdown(
+      input.problem.statement_markdown,
+      input.problem.url,
+    ),
   );
+  assertStructuredStatement(input.problem.platform, statement);
   const transcriptJson = JSON.stringify(input.reflection.transcript_messages);
   const rating = input.problem.rating ?? null;
   const difficulty =
@@ -424,7 +432,7 @@ export async function updateProblemProperties(
   const d1 = await getD1();
   const current = await d1
     .prepare(
-      `SELECT title, contest, problem_index, rating, difficulty, state, status,
+      `SELECT platform, title, contest, problem_index, rating, difficulty, state, status,
               archived_at, due_date, sprint_id,
               next_review_date, official_tags_json, url, statement_markdown,
               statement_assets_json, statement_hash, statement_captured_at,
@@ -478,7 +486,16 @@ export async function updateProblemProperties(
   const statement =
     input.statementMarkdown === undefined
       ? String(current.statement_markdown)
-      : sanitizeStatementMarkdown(input.statementMarkdown, String(current.url));
+      : normalizeStatementForPlatform(
+          String(current.platform) as Platform,
+          sanitizeStatementMarkdown(
+            input.statementMarkdown,
+            String(current.url),
+          ),
+        );
+  if (input.statementMarkdown !== undefined) {
+    assertStructuredStatement(String(current.platform) as Platform, statement);
+  }
   const statementChanged = input.statementMarkdown !== undefined;
   const assets =
     input.statementAssets === undefined

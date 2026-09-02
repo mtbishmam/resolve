@@ -11,7 +11,8 @@ problems, reflections, reviews, saved views, sprints, and mashups.
 ```text
 Canonical problem URL (default)
   -> Codex retrieves the official page
-  -> platform-aware normalized statement
+  -> platform adapter + shared statement parser
+  -> normalized statement and structural sample guard
   -> Codex in the ReSolve local project
   -> adaptive interview
   -> push_problem
@@ -78,7 +79,8 @@ Keep the tool surface small and outcome-oriented:
 - `list_sprints`
 
 `save_reflection` validates canonical identity, detects duplicates, stores the
-statement and reflection, derives difficulty from a numeric rating or validates
+statement through `normalizeStatementForPlatform` and
+`assertStructuredStatement`, stores the reflection, derives difficulty from a numeric rating or validates
 the adaptive difficulty supplied for an unrated problem, creates the first
 review schedule, and returns the saved identifiers and due date in one
 transaction.

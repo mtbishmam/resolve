@@ -1,6 +1,50 @@
 type CaptureAsset = { url: string; alt: string };
 
 function captureCodeforcesProblem() {
+  // Chrome serializes only this function when executeScript runs it. Keep the
+  // parser helpers inside the injected function so the browser uses the same
+  // deterministic sample formatter rather than a closure that disappears.
+  function normalizePreformattedText(value: string) {
+    return value
+      .replace(/\r\n?/g, "\n")
+      .split("\n")
+      .map((line) => line.replace(/[ \t]+$/g, ""))
+      .join("\n")
+      .replace(/^\n+|\n+$/g, "");
+  }
+
+  function formatCodeforcesSampleMarkdown(input: string, output: string) {
+    const inputText = normalizePreformattedText(input);
+    const outputText = normalizePreformattedText(output);
+    if (!inputText || !outputText) {
+      throw new Error(
+        "A Codeforces sample must contain input and output text.",
+      );
+    }
+    return [
+      "\n\n### Input\n\n",
+      "```text\n",
+      inputText,
+      "\n```\n\n",
+      "### Output\n\n",
+      "```text\n",
+      outputText,
+      "\n```\n\n",
+    ].join("");
+  }
+
+  function hasStructuredCodeforcesSamples(markdown: string) {
+    const fencedBlocks = markdown.match(
+      /```(?:text|plaintext)?\s*\n[\s\S]*?```/gi,
+    );
+    return Boolean(
+      /#{2,6}\s+Example(?:s)?\b/i.test(markdown) &&
+      /#{2,6}\s+Input\b/i.test(markdown) &&
+      /#{2,6}\s+Output\b/i.test(markdown) &&
+      (fencedBlocks?.length ?? 0) >= 2,
+    );
+  }
+
   function text(element: Element | null) {
     return element?.textContent?.trim() ?? "";
   }
@@ -53,11 +97,36 @@ function captureCodeforcesProblem() {
       ).toString()})`;
     }
     if (node.tagName === "BR") return "\n";
+    if (node.matches(".sample-test")) {
+      const inputs = [...node.querySelectorAll(".input > pre")];
+      const outputs = [...node.querySelectorAll(".output > pre")];
+      if (!inputs.length || inputs.length !== outputs.length) {
+        throw new Error(
+          "Codeforces sample input/output blocks are incomplete.",
+        );
+      }
+      return inputs
+        .map((input, index) => {
+          const inputLines = [...input.children].length
+            ? [...input.children]
+                .map((line) => line.textContent ?? "")
+                .join("\n")
+            : (input.textContent ?? "");
+          const output = outputs[index];
+          const outputLines = [...output.children].length
+            ? [...output.children]
+                .map((line) => line.textContent ?? "")
+                .join("\n")
+            : (output.textContent ?? "");
+          return formatCodeforcesSampleMarkdown(inputLines, outputLines);
+        })
+        .join("");
+    }
     if (node.tagName === "PRE") {
       const lines = [...node.children].length
         ? [...node.children].map((line) => line.textContent ?? "").join("\n")
         : (node.textContent ?? "");
-      return `\n\n\`\`\`text\n${lines.trimEnd()}\n\`\`\`\n\n`;
+      return `\n\n\`\`\`text\n${normalizePreformattedText(lines)}\n\`\`\`\n\n`;
     }
     if (/^H[1-6]$/.test(node.tagName)) {
       return `\n\n## ${normalizeMath(text(node))}\n\n`;
@@ -124,6 +193,14 @@ function captureCodeforcesProblem() {
     .join("")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+  if (
+    statement.querySelector(".sample-test") &&
+    !hasStructuredCodeforcesSamples(markdown)
+  ) {
+    throw new Error(
+      "Codeforces samples could not be parsed into separate text blocks.",
+    );
+  }
   return {
     schema: "resolve.capture.v1",
     capture_id: crypto.randomUUID(),

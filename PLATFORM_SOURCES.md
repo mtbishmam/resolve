@@ -25,6 +25,26 @@ The complete statement should look equally polished regardless of source:
 proper mathematical notation, one semantic section per heading, and sample
 input/output in separate fenced `text` blocks.
 
+## Deterministic statement parser
+
+All URL-first captures pass through `lib/statement-parser.ts` before any MCP
+write. The platform adapter first recovers explicit sample pairs; the shared
+formatter emits the canonical fenced Markdown, and the structural guard rejects
+flattened samples. The database write path runs the same normalization and
+guard again, so a caller cannot bypass this contract by sending malformed
+Markdown directly.
+
+| Platform   | Parser responsibility                                                                                   |
+| ---------- | ------------------------------------------------------------------------------------------------------- |
+| Codeforces | Use the DOM capture in `extension/src/popup.ts`; preserve MathJax source and every `.sample-test` pair. |
+| CSES       | Pair the official Example input and output blocks.                                                      |
+| AtCoder    | Select the English `Problem Statement`; pair numbered `Sample Input` and `Sample Output` sections.      |
+| CodeChef   | Capture the rendered JavaScript page and require explicit sample pairs before persistence.              |
+| LightOJ    | Split the official two-column sample table into separate input and output blocks.                       |
+
+If an adapter cannot recover the pair structure, keep the URL/capture pending
+or ask for an exact page capture. Do not hand-write replacement sample text.
+
 ## Platform registry
 
 | Platform   | URL coaching | ReSolve persistence | Canonical key                             | Important extraction notes                                                                                                                                      |
