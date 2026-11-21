@@ -11,10 +11,15 @@
       <img src="icons/icon-32.png" alt="" />
       <div>
         <strong>ReSolve</strong>
-        <em>Codeforces capture</em>
+        <em>Mashup timer · Codeforces capture</em>
       </div>
     </header>
     <main>
+      <section class="mashup-timer" aria-label="Mashup timer">
+        <strong id="mashup-problem">Local mashup</strong>
+        <output id="mashup-time" hidden></output>
+        <em id="mashup-state">Checking timer…</em>
+      </section>
       <p>
         Copy this problem’s identity, statement, math, and diagrams into one
         safe capture.
@@ -26,5 +31,6 @@
       </div>
     </main>
     <script type="module" src="popup.js"></script>
+    <script type="module" src="timer-popup.js"></script>
   </body>
 </html>

@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import assert from "node:assert/strict";
@@ -183,7 +183,71 @@ A_1 A_2 ... A_N
     polishedStatement.statement_hash,
     "51b01a5f35ce5bf3f15af0835dda97f2549145de950de69522cc618be64d09f3",
   );
-  console.log("D1 migrations and double seed passed.");
+  d1([
+    "--file",
+    resolve(root, "drizzle", "0017_november_sprint_mashup_clock.sql"),
+  ]);
+  const seedNovember = () =>
+    execFileSync(
+      process.execPath,
+      [resolve(root, "scripts/seed-november-sprint.mjs")],
+      {
+        cwd: root,
+        env: { ...process.env, RESOLVE_LOCAL_STATE_DIR: temp },
+      },
+    );
+  seedNovember();
+  const november = query(`SELECT problem_key, due_date, cp31_position
+    FROM problems WHERE sprint_id = 'sprint-2026-11' ORDER BY cp31_position`);
+  const { records } = JSON.parse(
+    await readFile(resolve(root, "data/cp31-august-2026.json"), "utf8"),
+  );
+  assert.deepEqual(
+    november.map((row) => row.problem_key),
+    records.map((problem) => problem.problemKey),
+  );
+  assert.deepEqual(
+    november.map((row) => row.cp31_position),
+    records.map((_, index) => index + 1),
+  );
+  assert.equal(november[0].due_date, "2026-11-09");
+  assert.equal(november.at(-1).due_date, "2026-12-06");
+  d1([
+    "--command",
+    "UPDATE problems SET due_date = '2026-11-10', solved_override = 1 WHERE cp31_position = 1",
+  ]);
+  seedNovember();
+  assert.deepEqual(
+    query(
+      "SELECT due_date, solved_override FROM problems WHERE cp31_position = 1",
+    ),
+    [{ due_date: "2026-11-10", solved_override: 1 }],
+  );
+  d1(["--file", resolve(root, "drizzle", "0014_mashup_results.sql")]);
+  d1([
+    "--command",
+    `INSERT INTO mashups (
+      id, problem_ids_json, notes_by_problem_json, duration_seconds,
+      started_at, status, created_at, updated_at
+    ) VALUES
+    ('legacy-notes-1', '["cf-1554-b"]', '{"cf-1554-b":{"approaches":"Old approach","lemmas":"Keep lemma"}}',
+     18000, '2026-11-08', 'completed', '2026-11-08', '2026-11-08'),
+    ('legacy-notes-2', '["cf-1554-b"]', '{"cf-1554-b":{"approaches":"New approach","lemmas":"","analysis":"Keep analysis"}}',
+     18000, '2026-11-09', 'completed', '2026-11-09', '2026-11-09')`,
+  ]);
+  d1(["--file", resolve(root, "drizzle", "0018_problem_practice_notes.sql")]);
+  const recovered = query(
+    "SELECT practice_notes_json FROM problems WHERE id = 'cf-1554-b'",
+  )[0];
+  assert.deepEqual(JSON.parse(recovered.practice_notes_json), {
+    approaches: "New approach",
+    lemmas: "Keep lemma",
+    analysis: "Keep analysis",
+  });
+  assert.equal(query("SELECT count(*) AS total FROM mashups")[0].total, 2);
+  console.log(
+    "D1 migrations, CP31 order, idempotent seeds, and legacy note recovery passed.",
+  );
 } finally {
   await rm(temp, { recursive: true, force: true });
 }

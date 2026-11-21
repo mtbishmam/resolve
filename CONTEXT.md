@@ -60,14 +60,19 @@ pending-draft workflow; `PLATFORM_SOURCES.md` records the boundary.
 
 ### Sprint problem flow
 
-1. Open **August Sprint** from the sidebar.
-2. Work through CP31 in rating order: 1600 on August 5–11, 1700 on August
-   12–18, 1800 on August 19–25, and 1900 on August 26–September 1.
-3. Select any problems across any views and create a focused mashup. Choose a
-   five-hour duration and, when needed, a start time earlier than now.
-4. Solve from the stored statement tabs. ReSolve keeps the global and active-tab
-   timers plus Approaches, Lemmas, and Analysis, and saves them in the
-   background.
+1. Open **November Sprint** from the sidebar.
+2. Work through CP31 in sheet order: 1600 on November 9–15, 1700 on November
+   16–22, 1800 on November 23–29, and 1900 on November 30–December 6.
+3. Select problems across any views or pick the next five unsolved in the Sprint.
+   Choose any start time and duration: a future start waits, a past start
+   starts immediately with elapsed time counted globally and on the first
+   problem, and **Now** selects the next five-minute mark.
+4. Keep the local mashup tab open and read from judge URLs with the extension.
+   The judge page and localhost show the same saved per-problem time. At one
+   accumulated hour the extension advances to the next problem with time left.
+   ReSolve saves the global and per-URL timers and six practice note fields.
+   Refresh reopens the same unfinished mashup paused; resume it or delete it
+   before starting over. Problem notes remain available outside the mashup.
 5. When a Sprint problem is later captured and reflected through Codex,
    `save_reflection` recognizes its canonical identity, keeps its Sprint due
    date, adds the reflection, and applies the explicitly supplied State and
@@ -104,6 +109,9 @@ pending-draft workflow; `PLATFORM_SOURCES.md` records the boundary.
   - Resolve means re-solving because recall or confidence is weak.
 - Archiving preserves Status and State instead of acting as another Status.
 - Pending AC is a saved view, not a special tag.
+- One core or custom saved view may be pinned as the startup view. The app
+  selects it on initial load, preserves normal navigation for the rest of the
+  session, and falls back to Due today when no view is pinned.
 - Raw interviews are append-only and must never be replaced by a summary.
 - `summary_markdown` is an objective problem-only summary: what is given, what
   must be found or computed, the condition, and the output. It must not contain

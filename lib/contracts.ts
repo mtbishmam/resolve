@@ -1,6 +1,12 @@
 import { z } from "zod";
 import { DIFFICULTIES, type Difficulty } from "@/lib/difficulty";
 import {
+  PRACTICE_NOTE_FIELDS,
+  PRACTICE_NOTE_LIMIT,
+  type PracticeNoteField,
+  type PracticeNotes,
+} from "@/lib/practice-notes";
+import {
   PROBLEM_STATES,
   PROBLEM_STATUSES,
   type ProblemState,
@@ -139,48 +145,41 @@ export const RecordReviewSchema = z.object({
   timer_elapsed_seconds: z.number().int().nonnegative().optional(),
 });
 
-export const CreateMashupSchema = z
-  .object({
-    sprint_id: z.string().min(1).nullable().optional(),
-    problem_ids: z.array(z.string().min(1)).min(1).max(124),
-    duration_seconds: z
-      .number()
-      .int()
-      .positive()
-      .max(24 * 60 * 60),
-    started_at: z.string().datetime(),
-  })
-  .refine((input) => Date.parse(input.started_at) <= Date.now(), {
-    path: ["started_at"],
-    message: "Mashup start time cannot be in the future",
-  });
+export const CreateMashupSchema = z.object({
+  sprint_id: z.string().min(1).nullable().optional(),
+  problem_ids: z.array(z.string().min(1)).min(1).max(124),
+  duration_seconds: z
+    .number()
+    .int()
+    .positive()
+    .max(24 * 60 * 60),
+  started_at: z.string().datetime().optional(),
+});
+
+export const PracticeNotesSchema = z.partialRecord(
+  z.enum(PRACTICE_NOTE_FIELDS.map(([field]) => field)),
+  z.string().max(PRACTICE_NOTE_LIMIT),
+);
 
 export const UpdateMashupSchema = z
   .object({
     active_problem_id: z.string().min(1).nullable().optional(),
-    elapsed_by_problem: z
-      .record(z.string(), z.number().int().nonnegative())
+    notes_by_problem: z.record(z.string(), PracticeNotesSchema).optional(),
+    clock_action: z
+      .enum(["pause", "recover", "resume", "heartbeat", "finish"])
       .optional(),
-    notes_by_problem: z
-      .record(
-        z.string(),
-        z.object({
-          approaches: z.string().max(50_000).default(""),
-          lemmas: z.string().max(50_000).default(""),
-          analysis: z.string().max(50_000).default(""),
-        }),
-      )
-      .optional(),
-    status: z.enum(["active", "completed"]).optional(),
   })
   .strict();
 
-export const RecordMashupResultSchema = z.object({
+export const RecordMashupResultSchema = z.strictObject({
   mashup_id: z.string().min(1),
   problem_id: z.string().min(1),
-  approaches: z.string().max(50_000).default(""),
-  lemmas: z.string().max(50_000).default(""),
-  analysis: z.string().max(50_000).default(""),
+  ...(Object.fromEntries(
+    PRACTICE_NOTE_FIELDS.map(([field]) => [
+      field,
+      z.string().max(PRACTICE_NOTE_LIMIT).optional(),
+    ]),
+  ) as Record<PracticeNoteField, z.ZodOptional<z.ZodString>>),
 });
 
 export const UpdateReflectionSchema = z
@@ -198,25 +197,24 @@ export type CreateMashupInput = z.infer<typeof CreateMashupSchema>;
 export type UpdateMashupInput = z.infer<typeof UpdateMashupSchema>;
 export type RecordMashupResultInput = z.infer<typeof RecordMashupResultSchema>;
 
-export type MashupProblemNotes = {
-  approaches: string;
-  lemmas: string;
-  analysis: string;
-};
-
 export type Mashup = {
   id: string;
   sprintId: string | null;
   problemIds: string[];
   activeProblemId: string | null;
   elapsedByProblem: Record<string, number>;
-  notesByProblem: Record<string, MashupProblemNotes>;
+  notesByProblem: Record<string, PracticeNotes>;
   durationSeconds: number;
   startedAt: string;
   endedAt: string | null;
   status: "active" | "completed";
   createdAt: string;
   updatedAt: string;
+  clockElapsedSeconds: number;
+  clockStartedMs: number | null;
+  clockSeenMs: number | null;
+  trackedProblemId: string | null;
+  revision: number;
 };
 
 export type ProblemListItem = {
@@ -230,6 +228,7 @@ export type ProblemListItem = {
   difficulty: Difficulty | null;
   state: ProblemState | null;
   status: ProblemStatus | null;
+  solvedOverride: boolean | null;
   archivedAt: string | null;
   dueDate: string | null;
   sprintId: string | null;
@@ -240,6 +239,7 @@ export type ProblemListItem = {
 };
 
 export type ProblemDetail = ProblemListItem & {
+  practiceNotes: PracticeNotes;
   url: string;
   officialTags: string[];
   statementMarkdown: string;

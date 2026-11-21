@@ -23,6 +23,16 @@ import {
 } from "react";
 import type { Mashup, ProblemDetail, ProblemListItem } from "@/lib/contracts";
 import {
+  formatPracticeNotes,
+  readPracticeNoteFields,
+  type PracticeNotes,
+} from "@/lib/practice-notes";
+import {
+  MASHUP_TAB_KEY,
+  mashupClock,
+  nextFiveMinuteBoundary,
+} from "@/lib/mashup-clock";
+import {
   DIFFICULTIES,
   matchesRatingRange,
   type Difficulty,
@@ -38,6 +48,7 @@ import {
 } from "@/lib/workflow";
 import MashupSurface from "./mashup-surface";
 import MashupHistory from "./mashup-history";
+import PracticeNoteFields from "./practice-note-fields";
 
 const MarkdownContent = lazy(() => import("./markdown"));
 
@@ -97,7 +108,8 @@ type Reveal =
   | "source";
 type Outcome = keyof typeof INITIAL_INTERVALS;
 
-const CACHE_KEY = "resolve.problem-index.v2";
+const CACHE_KEY = "resolve.problem-index.v3";
+const CF_HANDLE_KEY = "resolve.codeforces-handle";
 const COLUMN_CACHE_KEY = "resolve.column-visibility.v1";
 const detailCacheKey = (id: string) => `resolve.problem-detail.v1:${id}`;
 const REVEALS: Reveal[] = [
@@ -241,15 +253,23 @@ export default function ReSolveApp({
     new Set(),
   );
   const [mashupBuilderOpen, setMashupBuilderOpen] = useState(false);
-  const [mashupStart, setMashupStart] = useState(localDateTimeInput);
+  const [mashupStart, setMashupStart] = useState("");
   const [mashupHours, setMashupHours] = useState("5");
   const [mashupError, setMashupError] = useState("");
   const [creatingMashup, setCreatingMashup] = useState(false);
   const [activeMashup, setActiveMashup] = useState<Mashup | null>(null);
+  const [ongoingMashup, setOngoingMashup] = useState<Mashup | null>(null);
+  const [manageMashup, setManageMashup] = useState(false);
+  const [cfHandle, setCfHandle] = useState("");
+  const [cfSolved, setCfSolved] = useState<Set<string>>(() => new Set());
+  const [cfSync, setCfSync] = useState("");
+  const cfRequest = useRef(0);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mashupHistoryOpen, setMashupHistoryOpen] = useState(false);
   const [offlineProgress, setOfflineProgress] = useState<string | null>(null);
   const [activeViewId, setActiveViewId] = useState("view-due-today");
+  const [pinningViewId, setPinningViewId] = useState<string | null>(null);
+  const [viewPreferenceStatus, setViewPreferenceStatus] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<ProblemDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
@@ -265,9 +285,7 @@ export default function ReSolveApp({
   );
   const [ratingStart, setRatingStart] = useState("");
   const [ratingEnd, setRatingEnd] = useState("");
-  const [sorting, setSorting] = useState<SortingState>([
-    { id: "dueDate", desc: false },
-  ]);
+  const [sorting, setSorting] = useState<SortingState>([]);
   const [visibility, setVisibility] = useState<VisibilityState>({});
   const [visibilityReady, setVisibilityReady] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
@@ -278,7 +296,79 @@ export default function ReSolveApp({
   const [drawerWidth, setDrawerWidth] = useState(720);
   const [fullPage, setFullPage] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
+  const initialViewApplied = useRef(false);
+  const userSelectedView = useRef(false);
   const today = todayDhaka();
+
+  const syncCodeforces = useCallback(async (handle: string) => {
+    const request = ++cfRequest.current;
+    if (!handle) {
+      setCfSolved(new Set());
+      setCfSync("");
+      return;
+    }
+    setCfSync("Checking Codeforces…");
+    try {
+      const cacheKey = `resolve.cf-solved.v1:${handle.toLowerCase()}`;
+      const cached = await idbGet<string[]>(cacheKey).catch(() => undefined);
+      if (request !== cfRequest.current) return;
+      setCfSolved(new Set(cached));
+      const response = await fetch(
+        `/api/codeforces/solved?handle=${encodeURIComponent(handle)}`,
+      );
+      const data = (await response.json()) as {
+        solved?: string[];
+        error?: string;
+      };
+      if (request !== cfRequest.current) return;
+      if (!response.ok || !data.solved)
+        throw new Error(data.error ?? "Codeforces sync unavailable.");
+      setCfSolved(new Set(data.solved));
+      setCfSync("Codeforces synced");
+      void idbSet(cacheKey, data.solved).catch(() => undefined);
+    } catch (error) {
+      if (request === cfRequest.current)
+        setCfSync(
+          error instanceof Error
+            ? error.message
+            : "Codeforces sync unavailable.",
+        );
+    }
+  }, []);
+
+  useEffect(() => {
+    const handle = localStorage.getItem(CF_HANDLE_KEY) ?? "";
+    setCfHandle(handle);
+    void syncCodeforces(handle);
+  }, [syncCodeforces]);
+
+  function configureCodeforces() {
+    const handle = window
+      .prompt("Codeforces handle (blank turns off sync)", cfHandle)
+      ?.trim();
+    if (handle === undefined) return;
+    localStorage.setItem(CF_HANDLE_KEY, handle);
+    setCfHandle(handle);
+    void syncCodeforces(handle);
+  }
+
+  const isSolved = useCallback(
+    (problem: ProblemListItem) =>
+      problem.solvedOverride ??
+      (problem.status === "accepted" ||
+        (problem.platform === "codeforces" &&
+          cfSolved.has(problem.problemKey))),
+    [cfSolved],
+  );
+
+  const refreshOngoing = useCallback(async () => {
+    const response = await fetch("/api/mashups?ongoing", { cache: "no-store" });
+    if (!response.ok)
+      throw new Error("Could not check for an unfinished mashup.");
+    const data = (await response.json()) as { mashup: Mashup | null };
+    setOngoingMashup(data.mashup);
+    return data.mashup;
+  }, []);
 
   const refresh = useCallback(async () => {
     setSyncing(true);
@@ -313,10 +403,32 @@ export default function ReSolveApp({
       if (!cancelled && cached?.length) setProblems(cached);
     });
     void refresh();
+    void (async () => {
+      const interrupted = sessionStorage.getItem(MASHUP_TAB_KEY);
+      if (interrupted) {
+        const response = await fetch(
+          `/api/mashups/${encodeURIComponent(interrupted)}`,
+          {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ clock_action: "recover" }),
+          },
+        ).catch(() => null);
+        if (response?.ok) {
+          const { mashup } = (await response.json()) as { mashup: Mashup };
+          if (!cancelled && mashup.status === "active") setActiveMashup(mashup);
+          else if (mashup.status === "completed")
+            sessionStorage.removeItem(MASHUP_TAB_KEY);
+        } else if (response?.status === 404) {
+          sessionStorage.removeItem(MASHUP_TAB_KEY);
+        }
+      }
+      await refreshOngoing();
+    })().catch(() => undefined);
     return () => {
       cancelled = true;
     };
-  }, [refresh]);
+  }, [refresh, refreshOngoing]);
 
   useEffect(() => {
     void idbGet<VisibilityState>(COLUMN_CACHE_KEY).then((cached) => {
@@ -365,6 +477,15 @@ export default function ReSolveApp({
 
   const activeView = views.find((view) => view.id === activeViewId);
   const activeSprint = sprints.find((sprint) => sprint.id === activeSprintId);
+  const month = today.slice(0, 7);
+  const currentSprint =
+    sprints.find((sprint) => sprint.month === month) ??
+    sprints.filter((sprint) => sprint.month < month && sprint.source).at(-1) ??
+    sprints[0];
+  const nextSprint = sprints.find(
+    (sprint) => sprint.month > (currentSprint?.month ?? month),
+  );
+  const nextUnsolved = filteredNextProblems();
   const filteredProblems = useMemo(() => {
     const query = search.trim().toLowerCase();
     return problems.filter((problem) => {
@@ -435,7 +556,34 @@ export default function ReSolveApp({
     today,
   ]);
 
-  function selectView(view: SavedView) {
+  function filteredNextProblems() {
+    if (!activeSprintId) return [];
+    return problems
+      .filter(
+        (problem) =>
+          problem.sprintId === activeSprintId &&
+          !problem.archivedAt &&
+          !isSolved(problem),
+      )
+      .slice(0, 5);
+  }
+
+  function selectSprint(id: string) {
+    userSelectedView.current = true;
+    setActiveSprintId(id);
+    setSearch("");
+    setStateFilter([]);
+    setWorkflowStatusFilter([]);
+    setTagFilter([]);
+    setPlatformFilter("all");
+    setDifficultyFilter("all");
+    setRatingStart("");
+    setRatingEnd("");
+    setSorting([]);
+  }
+
+  const selectView = useCallback((view: SavedView, isInitial = false) => {
+    if (!isInitial) userSelectedView.current = true;
     setActiveSprintId(null);
     setActiveViewId(view.id);
     setSearch(view.filter.search ?? "");
@@ -452,14 +600,82 @@ export default function ReSolveApp({
     setRatingEnd(
       view.filter.ratingEnd === undefined ? "" : String(view.filter.ratingEnd),
     );
-    if (view.sort.length) {
-      setSorting(
-        view.sort.map((sort) => ({
-          ...sort,
-          id: sort.id === "nextReviewDate" ? "dueDate" : sort.id,
+    setSorting(
+      view.id.startsWith("view-")
+        ? []
+        : view.sort.map((sort) => ({
+            ...sort,
+            id: sort.id === "nextReviewDate" ? "dueDate" : sort.id,
+          })),
+    );
+  }, []);
+
+  useEffect(() => {
+    if (initialViewApplied.current || !views.length) return;
+    initialViewApplied.current = true;
+    if (userSelectedView.current) return;
+    const pinnedView = views.find((view) => view.isDefault);
+    const defaultView =
+      pinnedView ?? views.find((view) => view.id === "view-due-today");
+    if (defaultView) selectView(defaultView, true);
+  }, [selectView, views]);
+
+  async function togglePinnedView(view: SavedView) {
+    const pinned = !view.isDefault;
+    setPinningViewId(view.id);
+    setViewPreferenceStatus("Saving start view…");
+    try {
+      const response = await fetch("/api/saved-views", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ id: view.id, pinned }),
+      });
+      if (!response.ok) throw new Error("Could not update the start view.");
+      const data = (await response.json()) as {
+        defaultViewId: string | null;
+      };
+      setViews((current) =>
+        current.map((item) => ({
+          ...item,
+          isDefault: item.id === data.defaultViewId,
         })),
       );
+      setViewPreferenceStatus(
+        pinned
+          ? `${view.name} will open when ReSolve starts.`
+          : "Start view cleared. Due today will open by default.",
+      );
+    } catch (error) {
+      setViewPreferenceStatus(
+        error instanceof Error
+          ? error.message
+          : "Could not update the start view.",
+      );
+    } finally {
+      setPinningViewId(null);
+      window.setTimeout(() => setViewPreferenceStatus(""), 3500);
     }
+  }
+
+  function pinButton(view: SavedView, className = "") {
+    const label = view.isDefault
+      ? `Unpin ${view.name} as the start view`
+      : `Pin ${view.name} as the start view`;
+    return (
+      <button
+        className={`pin-view ${view.isDefault ? "pinned" : ""} ${className}`}
+        type="button"
+        aria-label={label}
+        aria-pressed={view.isDefault}
+        title={label}
+        disabled={pinningViewId !== null}
+        onClick={() => void togglePinnedView(view)}
+      >
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M5.2 2.25h5.6l-.65 3.2 1.8 1.8v1H8.6v5.2l-.6.8-.6-.8v-5.2H4.65v-1l1.8-1.8-.65-3.2Z" />
+        </svg>
+      </button>
+    );
   }
 
   async function saveCurrentView() {
@@ -499,6 +715,7 @@ export default function ReSolveApp({
         difficulty: Difficulty | null;
         state: ProblemState | null;
         status: ProblemStatus | null;
+        solvedOverride: boolean | null;
         archived: boolean;
         dueDate: string | null;
         nextReviewDate: string | null;
@@ -512,6 +729,9 @@ export default function ReSolveApp({
                 ...problem,
                 ...(patch.state !== undefined ? { state: patch.state } : {}),
                 ...(patch.status !== undefined ? { status: patch.status } : {}),
+                ...(patch.solvedOverride !== undefined
+                  ? { solvedOverride: patch.solvedOverride }
+                  : {}),
                 ...(patch.dueDate !== undefined
                   ? { dueDate: patch.dueDate }
                   : {}),
@@ -553,7 +773,12 @@ export default function ReSolveApp({
             className="problem-cell"
             onClick={() => void loadDetail(row.original.id)}
           >
-            <span>{row.original.title}</span>
+            <span>
+              {row.original.title}
+              {isSolved(row.original) ? (
+                <small className="solved-tag">Solved</small>
+              ) : null}
+            </span>
             <Secondary problem={row.original} />
           </button>
         ),
@@ -663,8 +888,36 @@ export default function ReSolveApp({
           );
         },
       }),
+      columnHelper.display({
+        id: "solvedOverride",
+        header: "Solved",
+        size: 112,
+        cell: ({ row }) => (
+          <select
+            className="inline-select"
+            aria-label={`Solved override for ${row.original.title}`}
+            value={
+              row.original.solvedOverride == null
+                ? ""
+                : String(row.original.solvedOverride)
+            }
+            onChange={(event) =>
+              void updateProblem(row.original.id, {
+                solvedOverride:
+                  event.target.value === ""
+                    ? null
+                    : event.target.value === "true",
+              }).catch(() => undefined)
+            }
+          >
+            <option value="">Auto</option>
+            <option value="true">Solved</option>
+            <option value="false">Unsolved</option>
+          </select>
+        ),
+      }),
     ],
-    [loadDetail, today, updateProblem],
+    [isSolved, loadDetail, today, updateProblem],
   );
 
   // TanStack Table intentionally exposes mutable instance methods.
@@ -708,12 +961,12 @@ export default function ReSolveApp({
     const durationSeconds = Math.round(Number(mashupHours) * 3600);
     if (
       !Number.isFinite(startedAt) ||
-      startedAt > Date.now() ||
+      !Number.isFinite(durationSeconds) ||
       durationSeconds < 15 * 60 ||
       durationSeconds > 24 * 60 * 60
     ) {
       setMashupError(
-        "Choose a past start time and a duration from 0.25 to 24 hours.",
+        "Choose a valid start time and a duration from 0.25 to 24 hours.",
       );
       return;
     }
@@ -730,12 +983,86 @@ export default function ReSolveApp({
           started_at: new Date(startedAt).toISOString(),
         }),
       });
-      if (!response.ok) throw new Error("Mashup creation failed");
+      if (!response.ok) {
+        const data = (await response.json()) as { error?: string };
+        if (response.status === 409) await refreshOngoing();
+        throw new Error(data.error ?? "Mashup creation failed");
+      }
       const data = (await response.json()) as { mashup: Mashup };
       setMashupBuilderOpen(false);
       setActiveMashup(data.mashup);
-    } catch {
-      setMashupError("The mashup could not be saved. Try again.");
+      setOngoingMashup(data.mashup);
+    } catch (error) {
+      setMashupError(
+        error instanceof Error
+          ? error.message
+          : "The mashup could not be saved.",
+      );
+    } finally {
+      setCreatingMashup(false);
+    }
+  }
+
+  function openMashupBuilder(ids?: string[]) {
+    if (ongoingMashup) {
+      setMashupError("");
+      setManageMashup(true);
+      return;
+    }
+    if (ids) setSelectedProblemIds(new Set(ids));
+    setMashupError("");
+    setMashupStart(
+      localDateTimeInput(new Date(nextFiveMinuteBoundary(Date.now()))),
+    );
+    setMashupBuilderOpen(true);
+  }
+
+  async function manageOngoing(action: "resume" | "delete") {
+    if (!ongoingMashup || creatingMashup) return;
+    if (
+      action === "delete" &&
+      !window.confirm(
+        "Delete this unfinished mashup and all its times and notes?",
+      )
+    )
+      return;
+    setCreatingMashup(true);
+    setMashupError("");
+    try {
+      const response = await fetch(
+        `/api/mashups/${ongoingMashup.id}`,
+        action === "delete"
+          ? {
+              method: "DELETE",
+            }
+          : {
+              method: "PATCH",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ clock_action: "resume" }),
+            },
+      );
+      if (response.status === 404) {
+        await refreshOngoing();
+        setManageMashup(false);
+        return;
+      }
+      if (!response.ok)
+        throw new Error(
+          ((await response.json()) as { error?: string }).error ??
+            "Could not update mashup.",
+        );
+      if (action === "resume") {
+        const { mashup } = (await response.json()) as { mashup: Mashup };
+        setActiveMashup(mashup);
+        setOngoingMashup(mashup);
+      } else {
+        await refreshOngoing();
+      }
+      setManageMashup(false);
+    } catch (error) {
+      setMashupError(
+        error instanceof Error ? error.message : "Could not update mashup.",
+      );
     } finally {
       setCreatingMashup(false);
     }
@@ -795,17 +1122,22 @@ export default function ReSolveApp({
                 matchesSavedView(problem, view.filter, today),
               ).length;
               return (
-                <button
+                <div
                   key={view.id}
-                  className={activeViewId === view.id ? "active" : ""}
-                  onClick={() => selectView(view)}
+                  className={`pinnable-view-row ${view.isDefault ? "is-pinned" : ""}`}
                 >
-                  <span
-                    className={`view-dot ${view.id.replace("view-", "")}`}
-                  />
-                  <span>{view.name}</span>
-                  <em>{count}</em>
-                </button>
+                  <button
+                    className={`select-view ${activeViewId === view.id ? "active" : ""}`}
+                    onClick={() => selectView(view)}
+                  >
+                    <span
+                      className={`view-dot ${view.id.replace("view-", "")}`}
+                    />
+                    <span>{view.name}</span>
+                    <em>{count}</em>
+                  </button>
+                  {pinButton(view)}
+                </div>
               );
             })}
         </nav>
@@ -818,15 +1150,19 @@ export default function ReSolveApp({
                 matchesSavedView(problem, view.filter, today),
               ).length;
               return (
-                <div className="saved-view-row" key={view.id}>
+                <div
+                  className={`saved-view-row pinnable-view-row ${view.isDefault ? "is-pinned" : ""}`}
+                  key={view.id}
+                >
                   <button
-                    className={activeViewId === view.id ? "active" : ""}
+                    className={`select-view ${activeViewId === view.id ? "active" : ""}`}
                     onClick={() => selectView(view)}
                   >
                     <span className="view-dot custom" />
                     <span>{view.name}</span>
                     <em>{count}</em>
                   </button>
+                  {pinButton(view)}
                   <button
                     className="delete-view"
                     aria-label={`Delete ${view.name}`}
@@ -851,39 +1187,36 @@ export default function ReSolveApp({
           <span>＋</span> Save current view
         </button>
         <div className="sidebar-spacer" />
-        {sprints[0] ? (
+        {currentSprint ? (
           <button
-            className={`sprint-card ${activeSprintId === sprints[0].id ? "active" : ""}`}
-            onClick={() => {
-              setActiveSprintId(sprints[0].id);
-              setSorting([{ id: "dueDate", desc: false }]);
-            }}
+            className={`sprint-card ${activeSprintId === currentSprint.id ? "active" : ""}`}
+            onClick={() => selectSprint(currentSprint.id)}
           >
             <span>Current sprint</span>
-            <strong>{sprints[0].name}</strong>
-            <em>{sprints[0].source ?? "To be decided"}</em>
+            <strong>{currentSprint.name}</strong>
+            <em>{currentSprint.source ?? "To be decided"}</em>
             <p>
               {
                 problems.filter(
                   (problem) =>
-                    problem.sprintId === sprints[0].id &&
-                    problem.status === "accepted",
+                    problem.sprintId === currentSprint.id && isSolved(problem),
                 ).length
               }
               /
               {
-                problems.filter((problem) => problem.sprintId === sprints[0].id)
-                  .length
+                problems.filter(
+                  (problem) => problem.sprintId === currentSprint.id,
+                ).length
               }{" "}
-              accepted
+              solved
             </p>
           </button>
         ) : null}
-        {sprints[1] ? (
+        {nextSprint ? (
           <div className="next-sprint">
             <span>Next sprint</span>
-            <strong>{sprints[1].name}</strong>
-            <em>{sprints[1].source ?? "To be decided"}</em>
+            <strong>{nextSprint.name}</strong>
+            <em>{nextSprint.source ?? "To be decided"}</em>
           </div>
         ) : null}
         <div className="storage-card">
@@ -955,6 +1288,14 @@ export default function ReSolveApp({
                 <button onClick={() => void downloadOfflineData()}>
                   Download for offline use
                 </button>
+                <button
+                  onClick={() => {
+                    setProfileOpen(false);
+                    configureCodeforces();
+                  }}
+                >
+                  Codeforces handle{cfHandle ? `: ${cfHandle}` : ""}
+                </button>
               </div>
             ) : null}
           </div>
@@ -974,14 +1315,28 @@ export default function ReSolveApp({
           <div className="toolbar-actions">
             <button
               className="mashup-launch"
-              disabled={selectedProblemIds.size === 0}
-              onClick={() => setMashupBuilderOpen(true)}
+              disabled={!ongoingMashup && selectedProblemIds.size === 0}
+              onClick={() => openMashupBuilder()}
             >
-              Create mashup
-              {selectedProblemIds.size ? (
+              {ongoingMashup ? "Unfinished mashup" : "Create mashup"}
+              {!ongoingMashup && selectedProblemIds.size ? (
                 <b>{selectedProblemIds.size}</b>
               ) : null}
             </button>
+            {activeSprint && !ongoingMashup ? (
+              <button
+                disabled={
+                  !nextUnsolved.length || cfSync === "Checking Codeforces…"
+                }
+                onClick={() =>
+                  openMashupBuilder(nextUnsolved.map((problem) => problem.id))
+                }
+              >
+                {nextUnsolved.length === 5
+                  ? "Mashup: next 5 unsolved"
+                  : `Mashup: next ${nextUnsolved.length} unsolved`}
+              </button>
+            ) : null}
             <button
               className={filtersOpen ? "active" : ""}
               onClick={() => setFiltersOpen((value) => !value)}
@@ -1179,6 +1534,7 @@ export default function ReSolveApp({
           table={table}
           selectedId={selectedId}
           onSelect={loadDetail}
+          isSolved={isSolved}
           selectable
           selectedProblemIds={selectedProblemIds}
           onSelectedProblemIds={setSelectedProblemIds}
@@ -1186,6 +1542,7 @@ export default function ReSolveApp({
         <ProblemCards
           problems={table.getRowModel().rows.map((row) => row.original)}
           onSelect={loadDetail}
+          isSolved={isSolved}
           onReview={(problem) => {
             void loadDetail(problem.id).then(() => setReviewOpen(true));
           }}
@@ -1198,6 +1555,12 @@ export default function ReSolveApp({
           <span>
             Showing {filteredProblems.length} of {problems.length}
           </span>
+          {cfSync ? <span role="status">{cfSync}</span> : null}
+          {activeSprint ? (
+            <button onClick={configureCodeforces}>
+              {cfHandle ? `Codeforces: ${cfHandle}` : "Set Codeforces handle"}
+            </button>
+          ) : null}
           <span>
             {syncing
               ? "Refreshing from D1…"
@@ -1216,6 +1579,11 @@ export default function ReSolveApp({
             setReviewOpen(true);
           }}
           onUpdate={updateDetail}
+          onNotesSaved={(updated) =>
+            setDetail((current) =>
+              current?.id === updated.id ? updated : current,
+            )
+          }
           width={drawerWidth}
           onWidth={setDrawerWidth}
           fullPage={fullPage}
@@ -1241,18 +1609,48 @@ export default function ReSolveApp({
             <span>Focused contest</span>
             <h2>Create a mashup</h2>
             <p>
-              {selectedProblemIds.size} selected problems. The first problem
-              receives any elapsed time before the chosen start.
+              {selectedProblemIds.size} selected problems. A future start waits;
+              a past start includes elapsed time globally and on the first
+              problem.
             </p>
             <label>
               Start time
               <input
                 type="datetime-local"
-                max={localDateTimeInput()}
                 value={mashupStart}
                 onChange={(event) => setMashupStart(event.target.value)}
               />
             </label>
+            <div className="mashup-time-shortcuts">
+              <button
+                type="button"
+                onClick={() => {
+                  const now = Date.now();
+                  const todayTime = `${localDateTimeInput().slice(0, 10)}T${mashupStart.slice(11)}`;
+                  setMashupStart(
+                    Date.parse(todayTime) > now
+                      ? todayTime
+                      : localDateTimeInput(
+                          new Date(nextFiveMinuteBoundary(now)),
+                        ),
+                  );
+                }}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  setMashupStart(
+                    localDateTimeInput(
+                      new Date(nextFiveMinuteBoundary(Date.now())),
+                    ),
+                  )
+                }
+              >
+                Now
+              </button>
+            </div>
             <label>
               Global timer (hours)
               <input
@@ -1281,13 +1679,63 @@ export default function ReSolveApp({
         </div>
       ) : null}
 
+      {manageMashup && ongoingMashup ? (
+        <div className="modal-backdrop">
+          <section
+            className="mashup-builder"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Unfinished mashup"
+          >
+            <span>Focused contest</span>
+            <h2>Unfinished mashup</h2>
+            <p>
+              {ongoingMashup.problemIds.length} problems ·{" "}
+              {formatTimer(mashupClock(ongoingMashup, Date.now()).elapsed)}{" "}
+              elapsed. Resume it or delete it before starting another.
+            </p>
+            {mashupError ? (
+              <p className="form-error" role="alert">
+                {mashupError}
+              </p>
+            ) : null}
+            <div>
+              <button
+                disabled={creatingMashup}
+                onClick={() => setManageMashup(false)}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={creatingMashup}
+                onClick={() => void manageOngoing("delete")}
+              >
+                Delete
+              </button>
+              <button
+                className="primary"
+                disabled={creatingMashup}
+                onClick={() => void manageOngoing("resume")}
+              >
+                Resume
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {activeMashup ? (
         <MashupSurface
           initialMashup={activeMashup}
+          local={local}
           problems={problems}
-          onClose={() => setActiveMashup(null)}
+          onClose={(mashup) => {
+            setOngoingMashup(mashup);
+            setActiveMashup(null);
+          }}
           onComplete={async () => {
             setActiveMashup(null);
+            setOngoingMashup(null);
             setSelectedProblemIds(new Set());
             await refresh();
           }}
@@ -1298,12 +1746,20 @@ export default function ReSolveApp({
         <MashupHistory
           problems={problems}
           onClose={() => setMashupHistoryOpen(false)}
+          onDelete={() => {
+            void refreshOngoing().catch(() => undefined);
+          }}
         />
       ) : null}
 
       {offlineProgress ? (
         <div className="sync-toast" role="status">
           {offlineProgress}
+        </div>
+      ) : null}
+      {viewPreferenceStatus ? (
+        <div className="sync-toast" role="status">
+          {viewPreferenceStatus}
         </div>
       ) : null}
 
@@ -1318,31 +1774,39 @@ export default function ReSolveApp({
           </div>
           <div className="mobile-panel-list">
             {views.map((view) => (
-              <button
+              <div
                 key={view.id}
-                onClick={() => {
-                  selectView(view);
-                  setMobileSection(
-                    view.id === "view-due-today" ? "today" : "problems",
-                  );
-                }}
+                className={`mobile-view-row ${view.isDefault ? "is-pinned" : ""}`}
               >
-                <span className={`view-dot ${view.id.replace("view-", "")}`} />
-                <strong>{view.name}</strong>
-                <em>
-                  {
-                    problems.filter((problem) =>
-                      matchesSavedView(problem, view.filter, today),
-                    ).length
-                  }
-                </em>
-              </button>
+                <button
+                  className="mobile-view-select"
+                  onClick={() => {
+                    selectView(view);
+                    setMobileSection(
+                      view.id === "view-due-today" ? "today" : "problems",
+                    );
+                  }}
+                >
+                  <span
+                    className={`view-dot ${view.id.replace("view-", "")}`}
+                  />
+                  <strong>{view.name}</strong>
+                  <em>
+                    {
+                      problems.filter((problem) =>
+                        matchesSavedView(problem, view.filter, today),
+                      ).length
+                    }
+                  </em>
+                </button>
+                {pinButton(view, "mobile-pin-view")}
+              </div>
             ))}
             {sprints.map((sprint) => (
               <button
                 key={sprint.id}
                 onClick={() => {
-                  setActiveSprintId(sprint.id);
+                  selectSprint(sprint.id);
                   setMobileSection("problems");
                 }}
               >
@@ -1373,6 +1837,9 @@ export default function ReSolveApp({
             <button onClick={() => setMashupHistoryOpen(true)}>
               <strong>Mashups</strong>
               <span>History, notes, copy, and delete</span>
+            </button>
+            <button onClick={configureCodeforces}>
+              <strong>Codeforces handle</strong>
             </button>
             <button onClick={() => void downloadOfflineData()}>
               <strong>Download for offline use</strong>
@@ -1428,6 +1895,7 @@ function ProblemTable({
   table,
   selectedId,
   onSelect,
+  isSolved,
   selectable,
   selectedProblemIds,
   onSelectedProblemIds,
@@ -1435,6 +1903,7 @@ function ProblemTable({
   table: ReturnType<typeof useReactTable<ProblemListItem>>;
   selectedId: string | null;
   onSelect: (id: string) => Promise<void>;
+  isSolved: (problem: ProblemListItem) => boolean;
   selectable: boolean;
   selectedProblemIds: Set<string>;
   onSelectedProblemIds: (ids: Set<string>) => void;
@@ -1473,6 +1942,9 @@ function ProblemTable({
               />
             </label>
           ) : null}
+          <span className="problem-number" aria-label="Position in view">
+            #
+          </span>
           {table.getHeaderGroups().map((headerGroup) =>
             headerGroup.headers.map((header) => (
               <button
@@ -1502,7 +1974,7 @@ function ProblemTable({
                 key={row.id}
                 className={`table-row ${
                   selectedId === row.original.id ? "selected" : ""
-                }`}
+                } ${isSolved(row.original) ? "solved-row" : ""}`}
                 style={{
                   height: virtualRow.size,
                   transform: `translateY(${virtualRow.start}px)`,
@@ -1535,6 +2007,7 @@ function ProblemTable({
                     />
                   </label>
                 ) : null}
+                <span className="problem-number">{virtualRow.index + 1}</span>
                 {row.getVisibleCells().map((cell) => (
                   <div
                     key={cell.id}
@@ -1556,6 +2029,7 @@ function ProblemTable({
 function ProblemCards({
   problems,
   onSelect,
+  isSolved,
   onReview,
   selectable,
   selectedProblemIds,
@@ -1563,6 +2037,7 @@ function ProblemCards({
 }: {
   problems: ProblemListItem[];
   onSelect: (id: string) => Promise<void>;
+  isSolved: (problem: ProblemListItem) => boolean;
   onReview: (problem: ProblemListItem) => void;
   selectable: boolean;
   selectedProblemIds: Set<string>;
@@ -1570,8 +2045,12 @@ function ProblemCards({
 }) {
   return (
     <div className="problem-cards">
-      {problems.map((problem) => (
-        <article key={problem.id} onClick={() => void onSelect(problem.id)}>
+      {problems.map((problem, index) => (
+        <article
+          key={problem.id}
+          className={isSolved(problem) ? "solved-row" : ""}
+          onClick={() => void onSelect(problem.id)}
+        >
           {selectable ? (
             <label
               className="mobile-problem-select"
@@ -1604,7 +2083,9 @@ function ProblemCards({
                 : "No status"}
             </span>
           </div>
-          <h2>{problem.title}</h2>
+          <h2>
+            <span className="problem-number">{index + 1}.</span> {problem.title}
+          </h2>
           <Secondary problem={problem} />
           <div className="card-bottom">
             <span>{problem.rating ?? "Unrated"}</span>
@@ -1636,6 +2117,7 @@ function DetailDrawer({
   onClose,
   onReview,
   onUpdate,
+  onNotesSaved,
   width,
   onWidth,
   fullPage,
@@ -1645,6 +2127,7 @@ function DetailDrawer({
   loading: boolean;
   onClose: () => void;
   onReview: () => void;
+  onNotesSaved: (problem: ProblemDetail) => void;
   onUpdate: (
     patch: Partial<{
       rating: number | null;
@@ -1745,17 +2228,22 @@ function DetailDrawer({
         </p>
       </div>
       <nav className="drawer-tabs">
-        {["overview", "statement", "reflection", "history", "provenance"].map(
-          (value) => (
-            <button
-              key={value}
-              className={tab === value ? "active" : ""}
-              onClick={() => setTab(value)}
-            >
-              {statusLabel(value)}
-            </button>
-          ),
-        )}
+        {[
+          "overview",
+          "statement",
+          "practice notes",
+          "reflection",
+          "history",
+          "provenance",
+        ].map((value) => (
+          <button
+            key={value}
+            className={tab === value ? "active" : ""}
+            onClick={() => setTab(value)}
+          >
+            {statusLabel(value)}
+          </button>
+        ))}
       </nav>
       <div className="drawer-content">
         {tab === "overview" ? (
@@ -1939,6 +2427,13 @@ function DetailDrawer({
             <Markdown statement>{detail.statementMarkdown}</Markdown>
           </section>
         ) : null}
+        {tab === "practice notes" ? (
+          <ProblemPracticeNotes
+            key={detail.id}
+            problem={detail}
+            onSaved={onNotesSaved}
+          />
+        ) : null}
         {tab === "reflection" ? (
           <ReflectionEditor reflection={reflection} />
         ) : null}
@@ -2023,6 +2518,111 @@ function DetailDrawer({
         ) : null}
       </div>
     </aside>
+  );
+}
+
+function ProblemPracticeNotes({
+  problem,
+  onSaved,
+}: {
+  problem: ProblemDetail;
+  onSaved: (problem: ProblemDetail) => void;
+}) {
+  const draftKey = `resolve.problem-notes-draft.v1:${problem.id}`;
+  const [edits, setEdits] = useState<PracticeNotes>(() => {
+    try {
+      return readPracticeNoteFields(
+        JSON.parse(sessionStorage.getItem(draftKey) ?? "null"),
+      );
+    } catch {
+      return {};
+    }
+  });
+  const [saving, setSaving] = useState(false);
+  const [status, setStatus] = useState("");
+  const notes = { ...problem.practiceNotes, ...edits };
+
+  async function save() {
+    setSaving(true);
+    setStatus("");
+    try {
+      const response = await fetch(
+        `/api/problems/${encodeURIComponent(problem.id)}`,
+        {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ practiceNotes: edits }),
+        },
+      );
+      if (!response.ok) throw new Error("Save failed");
+      const { problem: updated } = (await response.json()) as {
+        problem: ProblemDetail;
+      };
+      onSaved(updated);
+      setEdits({});
+      try {
+        sessionStorage.removeItem(draftKey);
+      } catch {
+        // The confirmed D1 save does not depend on browser storage.
+      }
+      setStatus("Saved to this problem");
+      void idbSet(detailCacheKey(updated.id), updated).catch(() => undefined);
+    } catch {
+      setStatus("Could not save. Your edits are still here; try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(
+        [problem.title, problem.url, formatPracticeNotes(notes)].join("\n\n"),
+      );
+      setStatus("Copied notes for ChatGPT");
+    } catch {
+      setStatus("Could not copy the notes.");
+    }
+  }
+
+  return (
+    <section className="problem-practice-notes mashup-notes">
+      <div>
+        <span>Practice notes</span>
+        <em role="status">
+          {saving
+            ? "Saving…"
+            : status ||
+              (Object.keys(edits).length
+                ? "Unsaved changes"
+                : "Reused in future mashups")}
+        </em>
+      </div>
+      <PracticeNoteFields
+        notes={notes}
+        disabled={saving}
+        onChange={(field, value) => {
+          const draft = { ...edits, [field]: value };
+          setEdits(draft);
+          try {
+            sessionStorage.setItem(draftKey, JSON.stringify(draft));
+            setStatus("Unsaved changes");
+          } catch {
+            setStatus("Draft storage unavailable. Save before leaving.");
+          }
+        }}
+      />
+      <div className="practice-note-actions">
+        <button
+          className="primary"
+          disabled={saving || !Object.keys(edits).length}
+          onClick={() => void save()}
+        >
+          Save notes
+        </button>
+        <button onClick={() => void copy()}>Copy notes for ChatGPT</button>
+      </div>
+    </section>
   );
 }
 

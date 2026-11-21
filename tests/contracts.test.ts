@@ -295,15 +295,25 @@ describe("reflection difficulty contract", () => {
 });
 
 describe("mashup contract", () => {
-  it("accepts a backdated five-hour focused session", () => {
+  it("accepts a scheduled five-hour focused session", () => {
     const parsed = CreateMashupSchema.parse({
-      sprint_id: "sprint-2026-08",
+      sprint_id: "sprint-2026-11",
       problem_ids: ["problem-a", "problem-b"],
       duration_seconds: 5 * 60 * 60,
-      started_at: "2026-08-04T00:00:00.000Z",
+      started_at: new Date(Date.now() + 300_000).toISOString(),
     });
     expect(parsed.problem_ids).toHaveLength(2);
     expect(parsed.duration_seconds).toBe(18_000);
+  });
+
+  it("accepts a manually backdated mashup start", () => {
+    const parsed = CreateMashupSchema.parse({
+      sprint_id: "sprint-2026-11",
+      problem_ids: ["problem-a"],
+      duration_seconds: 2 * 60 * 60,
+      started_at: "2020-01-01T09:00:00.000Z",
+    });
+    expect(parsed.started_at).toBe("2020-01-01T09:00:00.000Z");
   });
 
   it("accepts notes for an existing mashup problem", () => {

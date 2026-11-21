@@ -8,13 +8,14 @@ online writes continue to sync to D1.
 
 Workflow is split into nullable **State** (`Retry`, `Revise`, `Resolve`) and
 **Status** (`Backlog`, `Attempting`, `Pending AC`, `Accepted`). Archiving
-preserves both. Due Today is the default view, and August 2026 is the CP31 Sheet
+preserves both. Due Today is the default view, and November 2026 is the CP31 Sheet
 sprint for existing 1600–1900 problems.
 
-August is seeded from the checked-in CP31 snapshot: 124 canonical problems,
-five per day within each seven-day rating block, starting August 5 and ending
-September 1. Select problems in any view for a persistent focused mashup with
-global and per-problem timers plus Approaches, Lemmas, and Analysis notes.
+November uses all 124 canonical problems in the original CP31 order, with
+five per day in each seven-day rating block from November 9 to December 6.
+Default views preserve that order. The **Solved** column can override Codeforces
+sync without changing a problem's solve Status. Select problems from any view,
+or use **Mashup: next 5 unsolved** in the Sprint view.
 
 ReSolve is a private, speed-first competitive-programming reflection and
 active-recall system.
@@ -35,16 +36,50 @@ nullable source references; a source file is never required.
 
 ## Local development
 
-Use Node 22.13 or newer.
+Use Node 22.13 or newer and npm. Stop an existing dev server before migrating.
 
 ```sh
-npm install
+cd /Users/mtbishmam/code/resolve
+npm ci --ignore-scripts      # first time, or after dependencies change
 npm run db:migrate:local
-npm run db:seed:local
+npm run db:sprint:local       # idempotent CP31 order and November dates
 npm run dev
 ```
 
-Open `http://localhost:3000`.
+Open <http://localhost:3000>. Local D1 lives in `.wrangler/state`. The
+migrations already include the checked-in showcase and CP31 data; do not
+reapply the showcase seed to your working database. This does not import or
+sync your hosted D1. For isolated testing, give Wrangler `--persist-to` and
+set `RESOLVE_LOCAL_STATE_DIR` to the same test directory for the Sprint seed
+and dev server.
+
+Once set up, run `npm --prefix /Users/mtbishmam/code/resolve run dev` from
+any folder. The Vite server is pinned to localhost port 3000 for the
+extension and fails if that port is already in use. For dependency
+maintenance, use `npm audit` and review the lockfile diff; do not use
+`npm audit fix --force` to downgrade or replace the toolchain. The
+dependency overrides in `package.json` and `pnpm-workspace.yaml` select
+patched transitive releases until their upstream packages do.
+
+In **November Sprint**, choose **Set Codeforces handle** once. Reloading the
+app refreshes your public Codeforces submissions via the official API.
+Accepted problems turn green. Choose **Solved**, **Unsolved**, or **Auto**
+in the Solved column to override or restore automatic detection.
+
+Choose any start time for a mashup. A future time waits; a past time starts
+immediately with elapsed time counted globally and on the first problem.
+**Now** picks the next five-minute mark.
+Keep the mashup in its own tab and use **Open judge** to read on the judge
+site. **Pause & exit** freezes all clocks and saves your notes. Use
+**Unfinished mashup** to resume or delete it; only one unfinished session is
+allowed. Finishing a session keeps its results and permits a new one.
+Refreshing the same mashup tab reopens that contest on the last selected
+problem, paused at its saved checkpoint. Click **Resume** to continue.
+Approaches, Lemmas, Analysis, General pattern, Memory trigger, and Mistakes
+autosave during a mashup and are available from each problem's **Practice
+notes** tab. Edits saved there prefill future mashups. Deleting contest history
+does not delete the problem notes. The **#** column (and mobile numbering)
+follows the current filtered and sorted list.
 
 ## Verification
 
@@ -112,9 +147,14 @@ hosting requires MCP OAuth 2.1; ChatGPT does not accept a custom API key in
 place of that flow. For an existing problem, ChatGPT first uses `get_problem`;
 a reflection uses `save_reflection`, whose canonical upsert updates the same
 row. A copied mashup packet includes `mashup_id` and `problem_id`, so ChatGPT
-calls `record_mashup_result`. That tool writes only Approaches, Lemmas, and
-Analysis—no problem insert is performed. The selected GPT model does not change
-these protocol or identity rules.
+can call `record_mashup_result` when explicitly asked to save. That tool merges
+the supplied practice fields into the existing mashup and problem—no problem
+insert is performed. `get_problem` includes `practiceNotes` for post-solve
+suggestions. Hosted MCP cannot read localhost D1; use the local MCP endpoint
+from a local client or **Copy notes for ChatGPT** in the problem's Practice
+notes tab. “I solved it,” “create problem,” and “push problem” trigger a key
+insight and five-minute recognition path in chat, without changing the standing
+Notion persistence workflow.
 
 For URL-first use, provide the canonical judge URL. Codex validates identity,
 retrieves the complete official statement, and calls `get_problem` before any
@@ -129,9 +169,15 @@ statement.
 npm run extension:build
 ```
 
-Load `extension/dist` as an unpacked Chromium extension. It contains no model
-calls, database credentials, or MCP token. Normal URL-first use does not require
-installing or opening the extension.
+Load `extension/dist` as an unpacked extension from `brave://extensions`
+or `chrome://extensions` (enable Developer mode). If already installed,
+reload it after rebuilding. The extension
+tracks the active problem URL for the ongoing mashup at `http://localhost:3000`.
+Its automatic top-right timer and the localhost mashup share the same elapsed
+time; pin the extension to see elapsed minutes on its toolbar icon. After
+an accumulated hour it opens the next problem with time left, in the same tab.
+It contains no model calls, database credentials, or MCP token. Normal
+URL-first coaching does not require the extension.
 
 ## Exports
 

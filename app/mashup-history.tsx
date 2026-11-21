@@ -2,6 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { Mashup, ProblemDetail, ProblemListItem } from "@/lib/contracts";
+import {
+  formatPracticeNotes,
+  PRACTICE_NOTE_FIELDS,
+} from "@/lib/practice-notes";
 
 function duration(seconds: number) {
   const value = Math.max(0, Math.floor(seconds));
@@ -16,9 +20,11 @@ function duration(seconds: number) {
 export default function MashupHistory({
   problems,
   onClose,
+  onDelete,
 }: {
   problems: ProblemListItem[];
   onClose: () => void;
+  onDelete: () => void;
 }) {
   const [mashups, setMashups] = useState<Mashup[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,11 +51,7 @@ export default function MashupHistory({
     );
     if (!response.ok) return;
     const { problem } = (await response.json()) as { problem: ProblemDetail };
-    const notes = mashup.notesByProblem[problemId] ?? {
-      approaches: "",
-      lemmas: "",
-      analysis: "",
-    };
+    const notes = mashup.notesByProblem[problemId] ?? {};
     const packet = [
       "resolve.mashup-result.v1",
       `mashup_id: ${mashup.id}`,
@@ -61,16 +63,9 @@ export default function MashupHistory({
       "## Problem statement",
       problem.statementMarkdown,
       "",
-      "## Approaches",
-      notes.approaches || "Not recorded",
+      formatPracticeNotes(notes) || "No notes recorded in this mashup.",
       "",
-      "## Lemmas",
-      notes.lemmas || "Not recorded",
-      "",
-      "## Analysis",
-      notes.analysis || "Not recorded",
-      "",
-      "Use the ReSolve MCP record_mashup_result tool with the mashup_id and problem_id above. The problem already exists; do not create a new problem entry.",
+      "If explicitly asked to save mashup notes, use ReSolve MCP record_mashup_result with the existing mashup_id and problem_id. Do not create a new problem.",
     ].join("\n");
     await navigator.clipboard.writeText(packet);
     setCopied(`${mashup.id}:${problemId}`);
@@ -79,7 +74,9 @@ export default function MashupHistory({
 
   async function removeMashup(mashup: Mashup) {
     if (
-      !window.confirm("Delete this mashup and all of its saved result notes?")
+      !window.confirm(
+        "Delete this mashup and its history? Notes saved on the problems will remain.",
+      )
     )
       return;
     const response = await fetch(
@@ -90,6 +87,7 @@ export default function MashupHistory({
     );
     if (response.ok) {
       setMashups((current) => current.filter((item) => item.id !== mashup.id));
+      onDelete();
     }
   }
 
@@ -131,7 +129,8 @@ export default function MashupHistory({
                   <strong>{mashup.problemIds.length} problem mashup</strong>
                 </div>
                 <em>
-                  {mashup.status} · {duration(mashup.durationSeconds)}
+                  {mashup.status === "active" ? "Unfinished" : "Completed"} ·{" "}
+                  {duration(mashup.clockElapsedSeconds)} elapsed
                 </em>
                 <b>{expanded === mashup.id ? "−" : "+"}</b>
               </button>
@@ -139,11 +138,7 @@ export default function MashupHistory({
                 <div className="mashup-result-body">
                   {mashup.problemIds.map((problemId, index) => {
                     const problem = problemsById.get(problemId);
-                    const notes = mashup.notesByProblem[problemId] ?? {
-                      approaches: "",
-                      lemmas: "",
-                      analysis: "",
-                    };
+                    const notes = mashup.notesByProblem[problemId] ?? {};
                     const copyKey = `${mashup.id}:${problemId}`;
                     return (
                       <section key={problemId}>
@@ -163,14 +158,12 @@ export default function MashupHistory({
                             {copied === copyKey ? "Copied" : "Copy for ChatGPT"}
                           </button>
                         </div>
-                        {(["approaches", "lemmas", "analysis"] as const).map(
-                          (field) => (
-                            <div className="mashup-result-field" key={field}>
-                              <span>{field}</span>
-                              <p>{notes[field] || "Not recorded"}</p>
-                            </div>
-                          ),
-                        )}
+                        {PRACTICE_NOTE_FIELDS.map(([field, label]) => (
+                          <div className="mashup-result-field" key={field}>
+                            <span>{label}</span>
+                            <p>{notes[field] || "Not recorded"}</p>
+                          </div>
+                        ))}
                       </section>
                     );
                   })}

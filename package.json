@@ -7,8 +7,8 @@
     "node": ">=22.13.0"
   },
   "scripts": {
-    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev",
-    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
+    "dev": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite dev",
+    "build": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vite build",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -21,6 +21,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply resolve-local --config wrangler.local.jsonc --local --persist-to .wrangler/state",
     "db:seed:local": "wrangler d1 execute resolve-local --config wrangler.local.jsonc --local --persist-to .wrangler/state --file drizzle/0001_showcase.sql",
+    "db:sprint:local": "node scripts/seed-november-sprint.mjs",
     "data:refresh": "node scripts/build-showcase-data.mjs && node scripts/generate-showcase-sql.mjs",
     "data:sprint": "node scripts/generate-cp31-sprint-sql.mjs",
     "export:local": "node scripts/export-local.mjs",
@@ -32,39 +33,59 @@
     "@tanstack/react-virtual": "3.13.12",
     "drizzle-orm": "0.45.2",
     "idb-keyval": "6.2.2",
-    "katex": "0.16.22",
-    "next": "16.2.6",
-    "react": "19.2.6",
-    "react-dom": "19.2.6",
+    "katex": "0.19.1",
+    "next": "16.4.5",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "react-markdown": "10.1.0",
     "rehype-katex": "7.0.1",
     "rehype-sanitize": "6.0.0",
     "remark-gfm": "4.0.1",
     "remark-math": "6.0.0",
-    "zod": "4.1.12"
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "1.37.1",
-    "@cloudflare/workers-types": "4.20260702.1",
-    "@tailwindcss/postcss": "4.2.1",
-    "@types/katex": "0.16.7",
+    "@cloudflare/vite-plugin": "1.67.0",
+    "@cloudflare/workers-types": "5.20261104.1",
+    "@tailwindcss/postcss": "4.3.5",
     "@types/chrome": "0.0.316",
+    "@types/katex": "0.16.7",
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "6.0.2",
-    "@vitejs/plugin-rsc": "0.5.26",
-    "drizzle-kit": "0.31.10",
+    "@vitejs/plugin-rsc": "0.5.39",
+    "drizzle-kit": "0.31.11",
     "eslint": "9.39.4",
-    "eslint-config-next": "16.2.6",
+    "eslint-config-next": "16.4.5",
     "prettier": "3.7.4",
-    "react-server-dom-webpack": "19.2.6",
-    "tailwindcss": "4.2.1",
-    "tsx": "4.20.6",
+    "react-server-dom-webpack": "19.3.1",
+    "tailwindcss": "4.3.5",
+    "tsx": "4.23.15",
     "typescript": "5.9.3",
-    "vinext": "0.0.50",
-    "vite": "8.0.13",
-    "vitest": "4.0.16",
-    "wrangler": "4.92.0"
+    "vinext": "1.4.4",
+    "vite": "8.3.6",
+    "vitest": "4.1.12",
+    "wrangler": "4.158.0"
+  },
+  "overrides": {
+    "@esbuild-kit/core-utils": {
+      "esbuild": "0.28.2"
+    },
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.5"
+    },
+    "@shuding/opentype.js": {
+      "fflate": "0.8.3"
+    },
+    "satori": {
+      "fflate": "0.8.3"
+    },
+    "rehype-katex": {
+      "katex": "$katex"
+    },
+    "micromark-extension-math": {
+      "katex": "$katex"
+    }
   }
 }

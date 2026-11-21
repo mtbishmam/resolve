@@ -32,6 +32,13 @@ There are two interfaces:
 - The ReSolve web app is the database, statement, filtering, and review
   interface.
 
+`GET /api/saved-views` returns the core and custom views plus the single
+`is_default` startup pin. `PATCH /api/saved-views` moves or clears that pin;
+the client applies it once after the initial view list loads, without
+overwriting navigation later in the same session. With no pin, startup falls
+back to **Due today**. This uses the existing `saved_views` row and requires no
+additional table or migration.
+
 ## Recommended stack
 
 - TypeScript throughout
@@ -64,6 +71,18 @@ database.
 
 The generated hosting hostname is sufficient for the MVP. A custom domain is
 optional.
+
+Local D1 is isolated from hosted D1. The Chromium extension reports supported
+judge URL changes to the loopback-only `/api/mashups/tracking` route. The
+server resolves canonical identity and membership before switching clocks;
+it does not accept browser-computed elapsed totals. The running clock uses
+timestamp deltas rather than background-tab tick counts. A lost browser
+check-in freezes the clock at the last checkpoint, requiring explicit resume.
+Only this loopback route accepts installed Chromium extension origins in
+the dev server. The judge overlay and mashup tabs project the same clock.
+Problem time caps at one accumulated hour; the server returns the next
+eligible judge URL in mashup order and the extension changes only the active
+judge tab. The global clock is independent.
 
 ## MCP tools
 
@@ -115,9 +134,11 @@ sources without expanding the persistence enum.
 one transaction.
 
 `record_mashup_result` verifies that `problem_id` is already in the indicated
-`mashup_id`, then updates only that mashup's notes JSON. It never upserts a
-problem and is the correct tool for a ChatGPT conversation started from a
-copied mashup packet.
+`mashup_id`, then merges supplied fields into the contest snapshot and canonical
+problem notes in one D1 transaction. It never inserts a problem. `get_problem`
+exposes the canonical notes for post-solve coaching. A same-tab reload restores
+the unfinished mashup at a paused checkpoint and retries unsent field patches
+from session storage; the browser draft is not the durable source of truth.
 
 `list_sprints` lets the model discover stable Sprint IDs. `get_problem`
 followed by `update_problem` is the MCP path for attaching a problem that is

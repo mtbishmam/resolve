@@ -98,3 +98,21 @@ button.secondary {
   background: #f8e8e6;
   color: #a44741;
 }
+.mashup-timer {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  margin-bottom: 8px;
+  border: 1px solid #dbe6df;
+  border-radius: 8px;
+}
+
+.mashup-timer output {
+  font: 700 24px monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.mashup-timer em {
+  font-size: 11px;
+  font-style: normal;
+}

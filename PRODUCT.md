@@ -2,20 +2,20 @@
 
 ReSolve has two independent workflow axes: review **State** and solve
 **Status**. Monthly Sprints turn a fixed practice sheet into daily due dates
-without inventing missing problems. August 2026 targets the 1600, 1700, 1800,
+without inventing missing problems. November 2026 targets the 1600, 1700, 1800,
 and 1900 CP31 bands at five problems per day, one seven-day block per band;
-September remains to be decided.
+December remains to be decided.
 
 ### Sprint flow
 
-The current Sprint card opens a dedicated problem view. August contains the
+The current Sprint card opens a dedicated problem view. November contains the
 124 canonical CP31 problems from the 1600, 1700, 1800, and 1900 lists. The
-shifted schedule starts on August 5:
+schedule starts on November 9:
 
-- 1600: August 5–11
-- 1700: August 12–18
-- 1800: August 19–25
-- 1900: August 26–September 1
+- 1600: November 9–15
+- 1700: November 16–22
+- 1800: November 23–29
+- 1900: November 30–December 6
 
 Each band assigns five problems on each of its first six days and its final
 problem on day seven, leaving four problems of daily capacity as offset. New
@@ -24,28 +24,43 @@ canonical `(platform, problem_key)` is attached to the Sprint and receives its
 due date without losing Status, State, archive history, reviews, reflections,
 or richer stored content.
 
+Default views show CP31 rows in their canonical sheet order. Codeforces
+acceptances are refreshed on app load for the configured handle and highlighted
+in green; a manual Solved/Unsolved override wins over automatic detection.
+The Sprint view can select the next five unarchived, unsolved problems in sheet order.
+
 Problems can be selected across any desktop view or mobile card list to create
 a focused mashup. Selection persists while switching views. A mashup shows one
 stored statement per tab, one global timer, a separate accumulated timer per
-tab, and per-problem Approaches, Lemmas, and Analysis fields. Its start may be
-any earlier instant,
-so a session started at 06:00 can be created at 06:11 with eleven minutes
-already elapsed. Timer state is saved periodically and when exiting or
-finishing. Profile → Mashups opens dated result history with copy and delete
-actions.
+problem, and six per-problem notes: Approaches, Lemmas, Analysis, General
+pattern, Memory trigger, and Mistakes. These notes remain on the problem and
+prefill future mashups. The global clock waits for a future scheduled start;
+a manually selected past start begins immediately with elapsed time counted
+globally and credited to the first problem (up to its one-hour cap). **Now**
+rounds up to the next five-minute mark. Per-problem time follows
+the judge URL through the extension, not the app's statement tabs. An
+automatic top-right timer stays visible on the judge page while you work,
+and the extension's toolbar badge shows elapsed minutes. The on-page timer
+and localhost app show the same elapsed time. At one accumulated hour
+the extension opens the next problem with time left, or shows **Time up** if
+there is none later in the mashup. Profile →
+Mashups opens dated result history with copy and delete actions.
 
 ### Mashup result flow
 
 1. Select problems from one or more views and choose **Create mashup**.
-2. Set a current or earlier start and the global duration. The button shows a
+2. Set any start time and the global duration. A future start waits; a past
+   start begins with elapsed time included. **Now** picks the next
+   five-minute boundary. The button shows a
    creating state until the persisted session opens.
-3. Solve from full-width stored statements; tab time and the three result fields
-   autosave.
-4. Finish or save and exit. Open Profile → Mashups to inspect the complete
-   dated result.
-5. **Copy for ChatGPT** copies the statement, identifiers, Approaches, Lemmas,
-   and Analysis. ChatGPT calls `record_mashup_result` with the existing IDs; it
-   does not create a problem.
+3. Solve from judge URLs with the extension or read stored statements. URL time
+   and the six result fields autosave. Same-tab refresh reopens the unfinished
+   session paused at its checkpoint, including edits pending autosave.
+4. **Pause & exit** freezes all timers. Resume the unfinished session or delete
+   it before creating another. **Finish mashup** saves a dated result.
+5. **Copy for ChatGPT** copies the statement, identifiers, and recorded notes.
+   ChatGPT reads canonical notes via `get_problem` before push suggestions, and
+   uses `record_mashup_result` with existing IDs only when asked to save.
 
 ## Product vocabulary
 
@@ -57,6 +72,9 @@ actions.
   approach without exposing the complete answer.
 - **Review**: a progressive active-recall attempt recorded as history.
 - **Saved view**: a reusable filter and sort definition.
+- **Pinned view**: the single core or saved view chosen as the app's startup
+  view. It is stored with the saved views and can be changed or cleared from
+  the sidebar or mobile Views panel; clearing it falls back to **Due today**.
 - **Status**: the objective progress of the initial solve and judge submission.
 - **State**: the nullable learning action currently queued for the problem.
 
@@ -130,7 +148,8 @@ Mobile:
 - A full-screen problem and review surface when opened
 
 The problem name is the primary visible identifier. Platform and contest
-metadata are secondary.
+metadata are secondary. Positions start at 1 and follow the current filtered
+and sorted view on desktop and mobile.
 
 ### Status and State
 

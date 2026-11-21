@@ -1,7 +1,8 @@
 import vinext from "vinext";
 import { defineConfig } from "vite";
-import hostingConfig from "./.openai/hosting.json";
-import { sites } from "./build/sites-vite-plugin";
+import hostingConfig from "./.openai/hosting.json" with { type: "json" };
+import { sites } from "./build/sites-vite-plugin.ts";
+import { localExtensionBridge } from "./build/local-extension-bridge.ts";
 
 const { d1 } = hostingConfig;
 const localBindingConfig = {
@@ -23,13 +24,23 @@ export default defineConfig(async () => {
   process.env.MINIFLARE_REGISTRY_PATH ??= ".wrangler/registry";
   const { cloudflare } = await import("@cloudflare/vite-plugin");
   return {
-    server: { watch: { useFsEvents: false, usePolling: true } },
+    server: {
+      host: "localhost",
+      port: 3000,
+      strictPort: true,
+      watch: { useFsEvents: false, usePolling: true },
+    },
     plugins: [
+      localExtensionBridge(),
       vinext(),
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
         config: localBindingConfig,
+        remoteBindings: false,
+        persistState: {
+          path: process.env.RESOLVE_LOCAL_STATE_DIR ?? ".wrangler/state",
+        },
       }),
     ],
   };

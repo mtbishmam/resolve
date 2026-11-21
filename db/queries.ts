@@ -11,6 +11,8 @@ import type {
 } from "@/lib/contracts";
 import { difficultyFromRating, type Difficulty } from "@/lib/difficulty";
 import { normalizeProblemUrl } from "@/lib/identity";
+import { backdatedProblemTime, mashupClock } from "@/lib/mashup-clock";
+import type { PracticeNotes } from "@/lib/practice-notes";
 import { nextReviewDate, SCHEDULE_VERSION } from "@/lib/schedule";
 import { sanitizeStatementMarkdown } from "@/lib/sanitize";
 import {
@@ -51,6 +53,8 @@ function listItem(row: Record<string, unknown>): ProblemListItem {
     difficulty: (row.difficulty as Difficulty | null) ?? null,
     state: (row.state as ProblemState | null) ?? null,
     status: (row.status as ProblemStatus | null) ?? null,
+    solvedOverride:
+      row.solved_override == null ? null : Boolean(row.solved_override),
     archivedAt: (row.archived_at as string | null) ?? null,
     dueDate: (row.due_date as string | null) ?? null,
     sprintId: (row.sprint_id as string | null) ?? null,
@@ -68,14 +72,14 @@ export async function listProblems() {
       `SELECT p.id, p.platform, p.problem_key, p.title, p.contest,
               p.problem_index, p.rating, p.difficulty, p.state, p.status,
               p.archived_at, p.due_date, p.sprint_id, p.next_review_date,
-              p.official_tags_json, r.source_status, p.updated_at
+              p.official_tags_json, p.solved_override, r.source_status, p.updated_at
        FROM problems p
        LEFT JOIN reflections r ON r.id = (
          SELECT r2.id FROM reflections r2
          WHERE r2.problem_id = p.id
          ORDER BY r2.created_at DESC LIMIT 1
        )
-       ORDER BY p.updated_at DESC`,
+       ORDER BY p.cp31_position ASC NULLS LAST, p.updated_at DESC, p.id`,
     )
     .all<Record<string, unknown>>();
   return (result.results ?? []).map(listItem);
@@ -113,6 +117,7 @@ export async function getProblemById(
   const base = listItem(problem);
   return {
     ...base,
+    practiceNotes: parseJson(problem.practice_notes_json, {}),
     url: String(problem.url),
     officialTags: parseJson(problem.official_tags_json, []),
     statementMarkdown: String(problem.statement_markdown),
@@ -168,6 +173,16 @@ export async function getProblemById(
           : Number(review.timer_elapsed_seconds),
     })),
   };
+}
+
+export async function updatePracticeNotes(id: string, notes: PracticeNotes) {
+  const result = await (await getD1())
+    .prepare(
+      "UPDATE problems SET practice_notes_json=json_patch(practice_notes_json, ?1) WHERE id=?2",
+    )
+    .bind(JSON.stringify(notes), id)
+    .run();
+  return Boolean(result.meta.changes);
 }
 
 export async function getProblemByIdentity(
@@ -417,6 +432,7 @@ export async function updateProblemProperties(
     difficulty?: Difficulty | null;
     state?: ProblemState | null;
     status?: ProblemStatus | null;
+    solvedOverride?: boolean | null;
     archived?: boolean;
     dueDate?: string | null;
     sprintId?: string | null;
@@ -516,7 +532,9 @@ export async function updateProblemProperties(
        official_tags_json=?12, statement_markdown=?13,
        statement_assets_json=?14, statement_hash=?15,
        statement_captured_at=?16, metadata_status=?17,
-       metadata_provenance_json=?18, updated_at=?19 WHERE id=?20`,
+       metadata_provenance_json=?18, updated_at=?19,
+       solved_override=CASE WHEN ?21 THEN ?22 ELSE solved_override END
+       WHERE id=?20`,
     )
     .bind(
       input.title?.trim() || current.title,
@@ -544,6 +562,8 @@ export async function updateProblemProperties(
       JSON.stringify(metadataProvenance),
       now,
       id,
+      Number(input.solvedOverride !== undefined),
+      input.solvedOverride == null ? null : Number(input.solvedOverride),
     )
     .run();
   return true;
@@ -636,6 +656,40 @@ export async function saveCustomView(input: {
   return { id };
 }
 
+export async function setDefaultView(id: string, pinned: boolean) {
+  const d1 = await getD1();
+  const existing = await d1
+    .prepare("SELECT id FROM saved_views WHERE id=?1")
+    .bind(id)
+    .first<{ id: string }>();
+  if (!existing) return false;
+
+  const now = new Date().toISOString();
+  if (pinned) {
+    await d1.batch([
+      d1
+        .prepare(
+          "UPDATE saved_views SET is_default=0, updated_at=?1 WHERE is_default=1 AND id<>?2",
+        )
+        .bind(now, id),
+      d1
+        .prepare(
+          "UPDATE saved_views SET is_default=1, updated_at=?1 WHERE id=?2",
+        )
+        .bind(now, id),
+    ]);
+    return true;
+  }
+
+  const result = await d1
+    .prepare(
+      "UPDATE saved_views SET is_default=0, updated_at=?1 WHERE id=?2 AND is_default=1",
+    )
+    .bind(now, id)
+    .run();
+  return Number(result.meta.changes ?? 0) > 0;
+}
+
 export async function deleteCustomView(id: string) {
   if (id.startsWith("view-")) return false;
   const d1 = await getD1();
@@ -682,7 +736,31 @@ function mashupItem(row: Record<string, unknown>): Mashup {
     status: row.status as "active" | "completed",
     createdAt: String(row.created_at),
     updatedAt: String(row.updated_at),
+    // Old unfinished sessions are paused at their last saved timestamp.
+    clockElapsedSeconds:
+      row.clock_elapsed_seconds == null
+        ? Math.max(
+            0,
+            (Date.parse(String(row.ended_at ?? row.updated_at)) -
+              Date.parse(String(row.started_at))) /
+              1000,
+          )
+        : Number(row.clock_elapsed_seconds),
+    clockStartedMs:
+      row.clock_started_ms == null ? null : Number(row.clock_started_ms),
+    clockSeenMs: row.clock_seen_ms == null ? null : Number(row.clock_seen_ms),
+    trackedProblemId: (row.tracked_problem_id as string | null) ?? null,
+    revision: Number(row.revision),
   };
+}
+
+export async function getOngoingMashup() {
+  const row = await (await getD1())
+    .prepare(
+      "SELECT * FROM mashups WHERE status = 'active' ORDER BY created_at DESC, id DESC LIMIT 1",
+    )
+    .first<Record<string, unknown>>();
+  return row ? mashupItem(row) : null;
 }
 
 export async function listMashups(sprintId?: string | null) {
@@ -700,42 +778,68 @@ export async function listMashups(sprintId?: string | null) {
 
 export async function createMashup(input: CreateMashupInput) {
   const d1 = await getD1();
-  const placeholders = input.problem_ids.map((_, index) => `?${index + 1}`);
   const existing = await d1
-    .prepare(`SELECT id FROM problems WHERE id IN (${placeholders.join(", ")})`)
-    .bind(...input.problem_ids)
-    .all<{ id: string }>();
-  if ((existing.results ?? []).length !== input.problem_ids.length) {
-    throw new Error("One or more selected problems do not exist");
+    .prepare(
+      "SELECT count(*) AS total FROM problems WHERE id IN (SELECT value FROM json_each(?1))",
+    )
+    .bind(JSON.stringify(input.problem_ids))
+    .first<{ total: number }>();
+  if (existing?.total !== input.problem_ids.length) {
+    throw new MashupRequestError(
+      "Selected problems must exist and be unique.",
+      400,
+    );
   }
+  const nowMs = Date.now();
+  const startMs = input.started_at ? Date.parse(input.started_at) : nowMs;
+  if (!Number.isFinite(startMs))
+    throw new MashupRequestError("Start time must be a valid date.", 400);
+  const initialProblemTime = backdatedProblemTime(
+    startMs,
+    nowMs,
+    input.problem_ids[0],
+  );
   const id = crypto.randomUUID();
-  const now = new Date().toISOString();
-  const initialElapsed = {
-    [input.problem_ids[0]]: Math.max(
-      0,
-      Math.floor((Date.parse(now) - Date.parse(input.started_at)) / 1000),
-    ),
-  };
-  await d1
+  const result = await d1
     .prepare(
       `INSERT INTO mashups (
         id, sprint_id, problem_ids_json, active_problem_id,
         elapsed_by_problem_json, notes_by_problem_json, duration_seconds,
-        started_at, ended_at, status, created_at, updated_at
-      ) VALUES (?1, ?2, ?3, ?4, ?5, '{}', ?6, ?7, NULL, 'active', ?8, ?8)`,
+        started_at, status, created_at, updated_at, clock_elapsed_seconds, clock_started_ms, clock_seen_ms
+      ) SELECT ?1, ?2, ?3, ?4, ?10,
+        (SELECT json_group_object(id, json(practice_notes_json)) FROM problems
+         WHERE id IN (SELECT value FROM json_each(?3)) AND practice_notes_json <> '{}'),
+        ?5, ?6, 'active', ?7, ?7, 0, ?8, ?9
+      WHERE NOT EXISTS (SELECT 1 FROM mashups WHERE status = 'active')`,
     )
     .bind(
       id,
       input.sprint_id ?? null,
       JSON.stringify(input.problem_ids),
       input.problem_ids[0],
-      JSON.stringify(initialElapsed),
       input.duration_seconds,
-      input.started_at,
-      now,
+      new Date(startMs).toISOString(),
+      new Date(nowMs).toISOString(),
+      startMs,
+      nowMs,
+      JSON.stringify(initialProblemTime),
     )
     .run();
+  if (!result.meta.changes)
+    throw new MashupRequestError(
+      "Resume or delete the unfinished mashup before creating another.",
+      409,
+    );
   return (await getMashup(id))!;
+}
+
+export class MashupRequestError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
 }
 
 export async function getMashup(id: string) {
@@ -747,78 +851,171 @@ export async function getMashup(id: string) {
   return row ? mashupItem(row) : null;
 }
 
-export async function updateMashup(id: string, input: UpdateMashupInput) {
-  const current = await getMashup(id);
-  if (!current) return null;
-  const problemIds = new Set(current.problemIds);
-  if (
-    input.active_problem_id !== undefined &&
-    input.active_problem_id !== null &&
-    !problemIds.has(input.active_problem_id)
-  ) {
-    throw new Error("The active problem is not part of this mashup");
-  }
-  const elapsed =
-    input.elapsed_by_problem === undefined
-      ? current.elapsedByProblem
-      : Object.fromEntries(
-          Object.entries(input.elapsed_by_problem).filter(([problemId]) =>
-            problemIds.has(problemId),
-          ),
-        );
-  const status = input.status ?? current.status;
-  const notes =
-    input.notes_by_problem === undefined
-      ? current.notesByProblem
-      : Object.fromEntries(
-          Object.entries(input.notes_by_problem).filter(([problemId]) =>
-            problemIds.has(problemId),
-          ),
-        );
-  const now = new Date().toISOString();
+export async function updateMashup(
+  id: string,
+  input: UpdateMashupInput,
+  tracking?: { problemId: string | null },
+) {
   const d1 = await getD1();
-  await d1
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const current = await getMashup(id);
+    if (!current) return null;
+    const now = Date.now();
+    const action = input.clock_action;
+    // A resume may be the first action after an abrupt tab exit.
+    // Keep the old checkpoint without charging downtime to the new segment.
+    const checkpoint = Math.max(
+      current.clockStartedMs ?? 0,
+      current.clockSeenMs ?? 0,
+    );
+    const clock = mashupClock(
+      current,
+      action === "resume" || action === "recover" ? checkpoint : now,
+    );
+    const selection = input.active_problem_id;
+    if (selection != null && !current.problemIds.includes(selection)) {
+      throw new MashupRequestError("This problem is not in the mashup.", 400);
+    }
+    if (action === "resume" && (await getOngoingMashup())?.id !== id) {
+      throw new MashupRequestError(
+        "Only the current unfinished mashup can be resumed.",
+        409,
+      );
+    }
+    const tracked =
+      tracking?.problemId && current.problemIds.includes(tracking.problemId)
+        ? tracking.problemId
+        : null;
+    if (tracking && (!clock.running || tracked === current.trackedProblemId))
+      return current;
+    const notePatches = Object.entries(input.notes_by_problem ?? {}).filter(
+      ([key, value]) =>
+        current.problemIds.includes(key) && Object.keys(value).length,
+    );
+    if (
+      action === "heartbeat" &&
+      !clock.running &&
+      !notePatches.length &&
+      selection === undefined
+    )
+      return current;
+    let notes = null;
+    if (notePatches.length) {
+      notes = { ...current.notesByProblem };
+      for (const [key, value] of notePatches) {
+        notes[key] = { ...notes[key], ...value };
+      }
+    }
+    const finished = current.status === "completed" || action === "finish";
+    const running =
+      !finished &&
+      action !== "pause" &&
+      action !== "recover" &&
+      (clock.running || action === "resume");
+    const anchor = running
+      ? Math.max(now, Date.parse(current.startedAt))
+      : null;
+    const update = d1
+      .prepare(
+        `UPDATE mashups SET active_problem_id = ?1, elapsed_by_problem_json = ?2,
+         notes_by_problem_json = COALESCE(?3, notes_by_problem_json), status = ?4, ended_at = ?5, updated_at = ?6,
+         clock_elapsed_seconds = ?7, clock_started_ms = ?8, clock_seen_ms = ?9,
+         tracked_problem_id = ?10, revision = revision + 1
+         WHERE id = ?11 AND revision = ?12`,
+      )
+      .bind(
+        selection === undefined ? current.activeProblemId : selection,
+        JSON.stringify(clock.byProblem),
+        notes && JSON.stringify(notes),
+        finished ? "completed" : "active",
+        finished ? (current.endedAt ?? new Date(now).toISOString()) : null,
+        new Date(now).toISOString(),
+        clock.elapsed,
+        anchor,
+        running ? (tracking ? current.clockSeenMs : now) : null,
+        running
+          ? tracking
+            ? tracked
+            : clock.running && action !== "resume"
+              ? current.trackedProblemId
+              : null
+          : null,
+        id,
+        current.revision,
+      );
+    // The problem merge and mashup revision update share one transaction.
+    // If the optimistic revision lost a race, neither write applies.
+    const result = notes
+      ? (
+          await d1.batch([
+            d1
+              .prepare(
+                `UPDATE problems
+             SET practice_notes_json=json_patch(practice_notes_json, (
+               SELECT value FROM json_each(?1) WHERE key=problems.id
+             ))
+             WHERE id IN (SELECT key FROM json_each(?1))
+               AND EXISTS (SELECT 1 FROM mashups WHERE id=?2 AND revision=?3)`,
+              )
+              .bind(
+                JSON.stringify(Object.fromEntries(notePatches)),
+                id,
+                current.revision,
+              ),
+            update,
+          ])
+        )[1]
+      : await update.run();
+    if (result.meta.changes) return getMashup(id);
+  }
+  throw new MashupRequestError(
+    "Mashup changed while saving. Please retry.",
+    409,
+  );
+}
+
+export async function getTrackedProblem(mashup: Mashup, url: string | null) {
+  if (!url) return null;
+  let identity;
+  try {
+    identity = normalizeProblemUrl(url);
+  } catch {
+    return null;
+  }
+  const problem = await (await getD1())
     .prepare(
-      `UPDATE mashups SET active_problem_id = ?1,
-       elapsed_by_problem_json = ?2, notes_by_problem_json = ?3, status = ?4,
-       ended_at = CASE WHEN ?4 = 'completed' THEN COALESCE(ended_at, ?5)
-                       ELSE NULL END,
-       updated_at = ?5 WHERE id = ?6`,
+      "SELECT id, title FROM problems WHERE platform = ?1 AND problem_key = ?2",
     )
-    .bind(
-      input.active_problem_id === undefined
-        ? current.activeProblemId
-        : input.active_problem_id,
-      JSON.stringify(elapsed),
-      JSON.stringify(notes),
-      status,
-      now,
-      id,
+    .bind(identity.platform, identity.problemKey)
+    .first<{ id: string; title: string }>();
+  return problem && mashup.problemIds.includes(problem.id) ? problem : null;
+}
+
+export async function getMashupProblemUrls(ids: string[]) {
+  const { results } = await (await getD1())
+    .prepare(
+      "SELECT id, url FROM problems WHERE id IN (SELECT value FROM json_each(?1))",
     )
-    .run();
-  return getMashup(id);
+    .bind(JSON.stringify(ids))
+    .all<{ id: string; url: string }>();
+  return new Map(results.map(({ id, url }) => [id, url]));
 }
 
 export async function recordMashupResult(input: RecordMashupResultInput) {
-  const current = await getMashup(input.mashup_id);
+  const { mashup_id, problem_id, ...notes } = input;
+  const current = await getMashup(mashup_id);
   if (!current) throw new Error("Mashup not found");
-  if (!current.problemIds.includes(input.problem_id)) {
+  if (!current.problemIds.includes(problem_id)) {
     throw new Error("The problem is not part of this mashup");
   }
-  const updated = await updateMashup(input.mashup_id, {
-    notes_by_problem: {
-      ...current.notesByProblem,
-      [input.problem_id]: {
-        approaches: input.approaches,
-        lemmas: input.lemmas,
-        analysis: input.analysis,
-      },
-    },
+  const updated = await updateMashup(mashup_id, {
+    notes_by_problem: { [problem_id]: notes },
   });
+  if (!updated) throw new Error("Mashup not found");
   return {
-    mashup_id: input.mashup_id,
-    problem_id: input.problem_id,
-    updated_at: updated?.updatedAt ?? null,
+    mashup_id,
+    problem_id,
+    updated_at: updated.updatedAt,
   };
 }
 

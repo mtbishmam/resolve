@@ -40,6 +40,7 @@ Initially hidden:
 - Key insight
 - Wrong mental model
 - Structured reflection
+- Problem practice notes (including pattern, trigger, and mistakes)
 - Raw transcript
 - Source code
 

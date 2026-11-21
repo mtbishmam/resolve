@@ -19,6 +19,33 @@ friction. It is not a general note-taking app or a Notion clone.
 
 Extreme speed is the number-one requirement.
 
+## Notion problem creation: create → open → enrich
+
+For “create problem,” “push problem,” and similar requests, Notion is the
+default destination. Only an explicit ReSolve destination authorizes a ReSolve
+write. Execute this latency-critical phase before the research/reflection
+checklists below:
+
+1. Use the exact current chat title, obtaining it with a targeted chat lookup
+   only if unavailable. Do not research or normalize the title first.
+2. Create a title-only `cppt` page using the known tracker target in the Notion
+   SOP. If this problem's page ID is already known, reuse it. Do not delay for
+   canonical identity, duplicate searches, source files, metadata, tags, dates,
+   State/Status questions, or the debrief. Resolve an uncertain creation
+   response before retrying; never blindly create a second page.
+3. Immediately open the returned URL in the visible in-app browser as the next
+   action and confirm it is open. Retain the page ID; report failures honestly.
+
+Only after opening, continue canonical verification, duplicate checks,
+metadata, formatting, relations, and other authorized enrichment in the same
+turn without requiring “continue.” Fetch latest page state and preserve user
+edits. If another canonical page is discovered, ask which to retain; do not
+silently merge or delete either. The detailed two-phase contract is in
+`/Users/mtbishmam/Library/Mobile Documents/iCloud~md~obsidian/Documents/obsidian/agents/reapps/resolve-notion-push.md`.
+Keep `create problem` metadata-only and keep the post-State/Status speed
+debrief. These priority rules override any checklist ordering below that would
+delay opening the page.
+
 ## Competitive-programming coach mode
 
 When the user provides a public problem URL, pastes a problem statement, or
@@ -45,6 +72,37 @@ the complete solution, editorial, proof, pseudocode, or code.
 
 The standing detailed coaching contract is in
 [`resolve-coach.md`](<../../Library/Mobile Documents/iCloud~md~obsidian/Documents/obsidian/reapps/resolve-coach.md>).
+
+### Post-solve speed debrief
+
+For the tracked problem, “I solved it” triggers an immediate short chat debrief:
+**Key insight** and **How to solve it in about 5 minutes**. For “create
+problem” or “push problem,” deliver that debrief immediately after the final
+State/Status answer has been saved and verified (or after metadata verification
+if those values were already supplied), before a push reflection interview.
+Do not wait for the user to ask again, and do not duplicate a debrief already
+given for the same problem unless new discussion supports a useful refinement.
+Name the visible statement clue, the shortest deduction/check exposing the
+invariant, the dead end to skip, and the minimal implementation plus a quick
+complexity/correctness check. Five minutes is a practice target, not a
+guaranteed time. Keep this create-time debrief in chat; “create problem” stays
+metadata-only in Notion. Parse compact answers flexibly, e.g. “Accepted,
+Resolve - 60 days” sets Status `Accepted`, State `Resolve`, and an explicit
+60-calendar-day review interval from today's `Asia/Dhaka` date, overriding the
+default interval for that problem.
+This exception to hint-only coaching applies to these explicit triggers, not a
+bare link or while the user is still working through hints.
+
+Before a push debrief, read the matching ReSolve `get_problem` by canonical
+identity and use nonempty `practiceNotes` (approaches, lemmas, analysis,
+pattern, memory_trigger, mistakes) as evidence for suggestions. Distinguish
+the user's saved notes from assistant suggestions. If work was recorded on
+localhost, use the local ReSolve endpoint when reachable; hosted MCP reads a
+separate database. Otherwise use pasted notes or the chat and say when the
+notes could not be read. Never invent the user's mistakes or reasoning. The
+debrief is in chat: “I solved it” does not authorize writes; “create problem”
+remains metadata-only; “push problem” follows the Notion SOP and preserves
+user edits. Do not write the debrief into ReSolve unless separately requested.
 
 Read `CONTEXT.md`, `PRODUCT.md`, `ARCHITECTURE.md`, and `DATA_MODEL.md` before
 changing product behavior or persistence.
@@ -76,9 +134,13 @@ exact page capture instead.
 
 ### Competitive-programming task titles
 
-Whenever the user pastes a supported judge problem link, rename the current
-Codex task after retrieving the canonical problem identifier and official
-problem name. Use exactly one space on each side of the hyphen:
+When the first supported judge problem link is pasted in a Codex task, rename
+the task after retrieving that link's canonical problem identifier and
+official problem name. This first linked problem is the problem being tracked
+for a possible reflection/push. Later judge links in the same task may be
+examples, comparisons, or references; do not rename the task for them unless
+the user explicitly asks to switch the tracked problem or change the task
+title. Use exactly one space on each side of the hyphen:
 
 - Codeforces: `<contest_id><problem_index> - <official problem name>`, for
   example `1899C - Yarik and Array`.
@@ -140,10 +202,12 @@ interviewed about a solved problem.
    most token-efficient input. Retrieve the official English statement and
    normalize its TeX, sample blocks, metadata, and external images. Accept a
    pasted `resolve.capture.v1` object or clean statement plus URL as fallbacks.
-2. Validate `(platform, problem_key)` and keep the title as only the official
-   problem name. If the problem already exists, use `get_problem` and refresh
-   its complete statement with `update_problem`; do not create a duplicate or
-   replace the statement with `summary_markdown`.
+2. After the Notion page is open, validate `(platform, problem_key)` for
+   enrichment. ReSolve reads may supply context, but `update_problem` writes
+   require an explicit ReSolve destination. In that explicitly requested
+   ReSolve workflow, keep its title as the official problem name and refresh
+   an existing canonical row rather than creating a duplicate. Never replace
+   a complete statement with `summary_markdown`.
 3. Derive the expected source filename and search
    `/Users/mtbishmam/code/competitive-programming/practice`.
 4. When one source file matches, read it as optional context.
@@ -175,14 +239,22 @@ interviewed about a solved problem.
     that reasoning.
 13. Propose tomorrow as the default first review date in `Asia/Dhaka`, while
     allowing manual override.
-14. Save only after the user explicitly says `push_problem` or otherwise
-    clearly asks to persist the completed reflection.
-15. Invoke one atomic, idempotent `save_reflection` MCP call and report only the
-    identifiers and due date confirmed by the tool.
-
-If MCP is unavailable, return a valid copyable payload marked **not saved**.
-Never improvise another database or claim success without a successful tool
-response.
+14. The title-only Notion page must already have been created and opened by
+    the priority Phase 1 above, before these enrichment steps. Keep its page ID
+    and preserve edits made while work continues. Do not create another page
+    here. The early title-only write is not a completed reflection.
+15. Enrich the page with a full reflection only after the user explicitly says
+    `push_problem` or otherwise clearly asks to persist the completed
+    reflection.
+16. Follow the current Notion persistence and relation workflow in
+    `/Users/mtbishmam/Library/Mobile Documents/iCloud~md~obsidian/Documents/obsidian/agents/reapps/resolve-notion-push.md`.
+    The Notion problem title must exactly match the Codex task name. Do not
+    write the new reflection to ReSolve's application database unless the user
+    explicitly changes this destination preference.
+17. Verify the Notion problem page and any contest/DSA relations before
+    reporting success. If Notion is unavailable or a write fails, keep the
+    pending note and label the problem **not saved**; never claim success
+    without a successful tool response.
 
 ## Review workflow
 

@@ -9,12 +9,25 @@ import {
   useRef,
   useState,
 } from "react";
+import { createPortal } from "react-dom";
 import type {
   Mashup,
-  MashupProblemNotes,
   ProblemDetail,
   ProblemListItem,
+  UpdateMashupInput,
 } from "@/lib/contracts";
+import {
+  mashupDraftKey,
+  parseMashupDraft,
+  type MashupDraft,
+} from "@/lib/mashup-draft";
+import type { PracticeNoteField } from "@/lib/practice-notes";
+import {
+  MASHUP_PROBLEM_LIMIT_SECONDS,
+  MASHUP_TAB_KEY,
+  mashupClock,
+} from "@/lib/mashup-clock";
+import PracticeNoteFields from "./practice-note-fields";
 
 const MarkdownContent = lazy(() => import("./markdown"));
 
@@ -33,23 +46,40 @@ export default function MashupSurface({
   problems,
   onClose,
   onComplete,
+  local,
 }: {
   initialMashup: Mashup;
   problems: ProblemListItem[];
-  onClose: () => void;
+  onClose: (mashup: Mashup) => void;
   onComplete: () => Promise<void>;
+  local: boolean;
 }) {
   const [mashup, setMashup] = useState(initialMashup);
+  const draftKey = mashupDraftKey(initialMashup.id);
+  const [initialDraft] = useState<MashupDraft>(() => {
+    try {
+      return parseMashupDraft(
+        sessionStorage.getItem(draftKey),
+        initialMashup.problemIds,
+      );
+    } catch {
+      return { notes: {} };
+    }
+  });
   const [activeId, setActiveId] = useState(
-    initialMashup.activeProblemId ?? initialMashup.problemIds[0],
+    initialDraft.activeProblemId ??
+      initialMashup.activeProblemId ??
+      initialMashup.problemIds[0],
   );
   const [details, setDetails] = useState<Record<string, ProblemDetail>>({});
-  const [elapsed, setElapsed] = useState(initialMashup.elapsedByProblem);
-  const elapsedRef = useRef(initialMashup.elapsedByProblem);
-  const [notes, setNotes] = useState(initialMashup.notesByProblem);
-  const notesRef = useRef(initialMashup.notesByProblem);
+  const [pendingNotes, setPendingNotes] = useState(initialDraft.notes);
+  const draft = useRef<MashupDraft>(initialDraft);
+  const [draftError, setDraftError] = useState(false);
+  const saves = useRef<Promise<unknown>>(Promise.resolve());
   const [now, setNow] = useState(() => Date.now());
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const endpoint = `/api/mashups/${initialMashup.id}`;
   const selected = useMemo(
     () =>
       mashup.problemIds
@@ -59,57 +89,92 @@ export default function MashupSurface({
   );
   const activeProblem = selected.find((problem) => problem.id === activeId);
   const activeDetail = activeId ? details[activeId] : undefined;
-  const globalElapsed = Math.max(
-    0,
-    Math.floor((now - Date.parse(mashup.startedAt)) / 1000),
-  );
+  const clock = mashupClock(mashup, now);
+  const globalElapsed = clock.elapsed;
   const remaining = mashup.durationSeconds - globalElapsed;
 
+  const storeDraft = useCallback(() => {
+    try {
+      if (
+        draft.current.activeProblemId ||
+        Object.keys(draft.current.notes).length
+      ) {
+        sessionStorage.setItem(draftKey, JSON.stringify(draft.current));
+      } else {
+        sessionStorage.removeItem(draftKey);
+      }
+      setDraftError(false);
+    } catch {
+      setDraftError(true);
+    }
+  }, [draftKey]);
+
   const persist = useCallback(
-    async (
-      patch: Partial<{
-        active_problem_id: string | null;
-        elapsed_by_problem: Record<string, number>;
-        notes_by_problem: Record<string, MashupProblemNotes>;
-        status: "active" | "completed";
-      }> = {},
-    ) => {
-      const response = await fetch(`/api/mashups/${mashup.id}`, {
-        method: "PATCH",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          active_problem_id: activeId,
-          elapsed_by_problem: elapsedRef.current,
-          notes_by_problem: notesRef.current,
-          ...patch,
-        }),
-      });
-      if (!response.ok) throw new Error("Mashup save failed");
-      const data = (await response.json()) as { mashup: Mashup };
-      setMashup(data.mashup);
-      return data.mashup;
+    (patch: UpdateMashupInput = {}) => {
+      const save = saves.current
+        .catch(() => undefined)
+        .then(async () => {
+          const pending = draft.current;
+          const response = await fetch(endpoint, {
+            method: "PATCH",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({
+              ...patch,
+              ...(pending.activeProblemId
+                ? { active_problem_id: pending.activeProblemId }
+                : {}),
+              ...(Object.keys(pending.notes).length
+                ? { notes_by_problem: pending.notes }
+                : {}),
+            }),
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (!response.ok)
+            throw new Error("Mashup save failed. Please retry.");
+          const data = (await response.json()) as { mashup: Mashup };
+          const notes = { ...draft.current.notes };
+          for (const [id, value] of Object.entries(pending.notes)) {
+            if (notes[id] === value) delete notes[id];
+          }
+          draft.current = {
+            activeProblemId:
+              draft.current.activeProblemId === pending.activeProblemId
+                ? undefined
+                : draft.current.activeProblemId,
+            notes,
+          };
+          if (Object.keys(pending.notes).length) setPendingNotes(notes);
+          storeDraft();
+          setMashup((current) =>
+            data.mashup.revision >= current.revision ? data.mashup : current,
+          );
+          setNow(Date.now());
+          setError("");
+          return data.mashup;
+        });
+      saves.current = save;
+      return save;
     },
-    [activeId, mashup.id],
+    [endpoint, storeDraft],
   );
 
   useEffect(() => {
-    elapsedRef.current = elapsed;
-  }, [elapsed]);
-
-  useEffect(() => {
-    notesRef.current = notes;
-  }, [notes]);
+    if (!Object.keys(pendingNotes).length && !draft.current.activeProblemId)
+      return;
+    const timer = window.setTimeout(() => {
+      void persist().catch(() =>
+        setError("Could not save mashup notes. Retrying at the next check-in."),
+      );
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [pendingNotes, persist]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       setNow(Date.now());
-      setElapsed((current) => ({
-        ...current,
-        [activeId]: (current[activeId] ?? 0) + 1,
-      }));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [activeId]);
+  }, []);
 
   useEffect(() => {
     if (!activeId || details[activeId]) return;
@@ -123,6 +188,9 @@ export default function MashupSurface({
         if (!cancelled) {
           setDetails((current) => ({ ...current, [activeId]: problem }));
         }
+      })
+      .catch(() => {
+        if (!cancelled) setError("The stored statement is unavailable.");
       });
     return () => {
       cancelled = true;
@@ -130,87 +198,190 @@ export default function MashupSurface({
   }, [activeId, details]);
 
   useEffect(() => {
-    const timer = window.setInterval(() => void persist(), 15_000);
-    return () => window.clearInterval(timer);
-  }, [persist]);
+    sessionStorage.setItem(MASHUP_TAB_KEY, initialMashup.id);
+    function refreshClock() {
+      if (document.hidden) return;
+      void fetch(endpoint, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8_000),
+      })
+        .then(async (response) => {
+          if (!response.ok) return;
+          const { mashup: next } = (await response.json()) as {
+            mashup: Mashup;
+          };
+          setMashup((current) =>
+            next.revision >= current.revision ? next : current,
+          );
+          setNow(Date.now());
+        })
+        .catch(() => undefined);
+    }
+    function pauseOnExit() {
+      const body = new Blob(["{}"], { type: "application/json" });
+      if (navigator.sendBeacon?.(endpoint, body)) return;
+      void fetch(endpoint, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body,
+        keepalive: true,
+      }).catch(() => undefined);
+    }
+    function restorePage(event: PageTransitionEvent) {
+      if (event.persisted) {
+        void persist({ clock_action: "recover" }).catch(() => refreshClock());
+      } else {
+        refreshClock();
+      }
+    }
+    const heartbeat = window.setInterval(() => {
+      void persist({ clock_action: "heartbeat" }).catch(() =>
+        setError("Could not check in with the local timer."),
+      );
+    }, 20_000);
+    const refresh = window.setInterval(refreshClock, 2000);
+    window.addEventListener("focus", refreshClock);
+    window.addEventListener("pagehide", pauseOnExit);
+    window.addEventListener("pageshow", restorePage);
+    document.addEventListener("visibilitychange", refreshClock);
+    return () => {
+      window.clearInterval(heartbeat);
+      window.clearInterval(refresh);
+      window.removeEventListener("focus", refreshClock);
+      window.removeEventListener("pagehide", pauseOnExit);
+      window.removeEventListener("pageshow", restorePage);
+      document.removeEventListener("visibilitychange", refreshClock);
+    };
+  }, [endpoint, initialMashup.id, persist]);
 
   async function changeProblem(problemId: string) {
-    await persist({ active_problem_id: problemId });
     setActiveId(problemId);
+    draft.current = { ...draft.current, activeProblemId: problemId };
+    storeDraft();
+    await persist().catch(() => setError("Could not save problem selection."));
   }
 
-  async function complete() {
+  async function changeClock(action: "pause" | "resume" | "finish") {
     setSaving(true);
     try {
-      await persist({ status: "completed" });
-      await onComplete();
+      const updated = await persist({ clock_action: action });
+      if (action !== "resume") sessionStorage.removeItem(MASHUP_TAB_KEY);
+      if (action === "pause") onClose(updated);
+      if (action === "finish") await onComplete();
+    } catch (error) {
+      setError(
+        error instanceof Error ? error.message : "Could not save mashup.",
+      );
     } finally {
       setSaving(false);
     }
   }
 
-  function updateNote(field: keyof MashupProblemNotes, value: string) {
+  function updateNote(field: PracticeNoteField, value: string) {
     if (!activeId) return;
-    setNotes((current) => ({
-      ...current,
-      [activeId]: {
-        approaches: current[activeId]?.approaches ?? "",
-        lemmas: current[activeId]?.lemmas ?? "",
-        analysis: current[activeId]?.analysis ?? "",
-        [field]: value,
-      },
-    }));
+    const updated = {
+      ...draft.current.notes[activeId],
+      [field]: value,
+    };
+    const notes = { ...draft.current.notes, [activeId]: updated };
+    draft.current = { ...draft.current, notes };
+    storeDraft();
+    setPendingNotes(notes);
   }
 
-  const activeNotes = notes[activeId] ?? {
-    approaches: "",
-    lemmas: "",
-    analysis: "",
+  const activeNotes = {
+    ...mashup.notesByProblem[activeId],
+    ...pendingNotes[activeId],
   };
 
-  return (
+  return createPortal(
     <div className="mashup-overlay">
       <section className="mashup-surface">
-        <header className="mashup-header">
-          <div>
-            <span>Focused mashup</span>
-            <strong className={remaining < 0 ? "timer overtime" : "timer"}>
-              {remaining < 0 ? "+" : ""}
-              {formatClock(Math.abs(remaining))}
-            </strong>
-            <em>{formatClock(globalElapsed)} elapsed</em>
-          </div>
-          <div className="mashup-actions">
-            <button
-              onClick={() => {
-                void persist().then(onClose);
-              }}
-            >
-              Save & exit
-            </button>
-            <button
-              className="primary"
-              disabled={saving}
-              onClick={() => void complete()}
-            >
-              {saving ? "Saving…" : "Finish mashup"}
-            </button>
-          </div>
-        </header>
+        <div className="mashup-sticky">
+          <header className="mashup-header">
+            <div>
+              <span>Focused mashup</span>
+              <strong className={remaining < 0 ? "timer overtime" : "timer"}>
+                {remaining < 0 ? "+" : ""}
+                {formatClock(Math.abs(remaining))}
+              </strong>
+              <em>
+                {clock.waiting
+                  ? `Starts in ${formatClock(Math.ceil((Date.parse(mashup.startedAt) - now) / 1000))}`
+                  : !clock.running
+                    ? "Paused"
+                    : `${formatClock(globalElapsed)} elapsed`}
+              </em>
+            </div>
+            <div className="mashup-actions">
+              {!clock.running ? (
+                <button
+                  disabled={saving}
+                  onClick={() => void changeClock("resume")}
+                >
+                  Resume
+                </button>
+              ) : null}
+              <button
+                disabled={saving}
+                onClick={() => void changeClock("pause")}
+              >
+                Pause & exit
+              </button>
+              <button
+                className="primary"
+                disabled={saving}
+                onClick={() => void changeClock("finish")}
+              >
+                {saving ? "Saving…" : "Finish mashup"}
+              </button>
+            </div>
+          </header>
 
-        <nav className="mashup-tabs" aria-label="Mashup problems">
-          {selected.map((problem, index) => (
-            <button
-              key={problem.id}
-              className={activeId === problem.id ? "active" : ""}
-              onClick={() => void changeProblem(problem.id)}
-            >
-              <span>{index + 1}</span>
-              <strong>{problem.title}</strong>
-              <em>{formatClock(elapsed[problem.id] ?? 0)}</em>
-            </button>
-          ))}
-        </nav>
+          <nav className="mashup-tabs" aria-label="Mashup problems">
+            {selected.map((problem, index) => {
+              const elapsed = clock.byProblem[problem.id] ?? 0;
+              const timeUp = elapsed >= MASHUP_PROBLEM_LIMIT_SECONDS;
+              const ticking =
+                !timeUp &&
+                clock.running &&
+                !clock.waiting &&
+                mashup.trackedProblemId === problem.id;
+              return (
+                <button
+                  key={problem.id}
+                  className={activeId === problem.id ? "active" : ""}
+                  onClick={() => void changeProblem(problem.id)}
+                >
+                  <span>{index + 1}</span>
+                  <strong>{problem.title}</strong>
+                  <em>
+                    {formatClock(elapsed)}
+                    {timeUp ? " · time up" : ticking ? " · tracking" : ""}
+                  </em>
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+        {error ? (
+          <p className="mashup-notice form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+        {draftError ? (
+          <p className="mashup-notice form-error" role="alert">
+            Browser draft storage is unavailable. Wait for autosave before
+            refreshing.
+          </p>
+        ) : null}
+        {local ? (
+          <p className="mashup-notice">
+            The ReSolve extension shows the same problem timer on judge pages
+            and advances after one hour. Keep this mashup open in a separate
+            tab.
+          </p>
+        ) : null}
 
         <article className="mashup-problem">
           <div className="mashup-statement">
@@ -223,9 +394,11 @@ export default function MashupSurface({
                   </span>
                   <h1>{activeProblem.title}</h1>
                 </div>
-                <a href={activeDetail?.url} target="_blank" rel="noreferrer">
-                  Open judge ↗
-                </a>
+                {activeDetail?.url ? (
+                  <a href={activeDetail.url} target="_blank" rel="noreferrer">
+                    Open judge ↗
+                  </a>
+                ) : null}
               </div>
             ) : null}
             {activeDetail ? (
@@ -241,28 +414,21 @@ export default function MashupSurface({
           <aside className="mashup-notes">
             <div>
               <span>Working result</span>
-              <em>Saved automatically</em>
+              <em role="status">
+                {Object.keys(pendingNotes).length
+                  ? "Saving notes…"
+                  : "Saved automatically"}
+              </em>
             </div>
-            {(["approaches", "lemmas", "analysis"] as const).map((field) => (
-              <label key={field}>
-                <span>{field[0].toUpperCase() + field.slice(1)}</span>
-                <textarea
-                  value={activeNotes[field]}
-                  placeholder={
-                    field === "approaches"
-                      ? "Approaches tried or considered…"
-                      : field === "lemmas"
-                        ? "Useful observations and lemmas…"
-                        : "Final complexity and failure analysis…"
-                  }
-                  onChange={(event) => updateNote(field, event.target.value)}
-                  onBlur={() => void persist()}
-                />
-              </label>
-            ))}
+            <PracticeNoteFields
+              notes={activeNotes}
+              onChange={updateNote}
+              disabled={saving}
+            />
           </aside>
         </article>
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }

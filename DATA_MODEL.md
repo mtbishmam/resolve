@@ -44,6 +44,13 @@ Core fields:
 - `archived_at`
 - `due_date`
 - `sprint_id`
+- `cp31_position`: canonical sheet position across the seeded rating bands
+- `solved_override`: nullable manual override of the solved highlight, independent of Status
+- `practice_notes_json`: independent, user-editable Approaches, Lemmas,
+  Analysis, General pattern, Memory trigger, and Mistakes. Loaded with problem
+  detail, not the list index. Unspecified fields are preserved; an empty string
+  clears a field. Migration 0018 recovers the latest nonblank legacy value per
+  field from existing mashups without rewriting their history.
 - `next_review_date`
 - `created_at`
 - `updated_at`
@@ -180,12 +187,15 @@ Core fields:
 - `filter_json`
 - `sort_json`
 - `visible_columns_json`
-- `is_default`
+- `is_default`: whether this is the single pinned startup view
 - `created_at`
 - `updated_at`
 
 Filters and sorts use a versioned expression format so future fields can be
 introduced without rewriting existing views.
+At most one row is pinned. Pinning another view clears the prior pin; clearing
+the pin makes the app fall back to **Due today** at startup. Core views and
+custom saved views use the same field and API.
 
 The built-in **Pending AC** view filters for `status = pending_ac` and
 `archived_at IS NULL`. Archived problems remain reachable through an archived
@@ -229,14 +239,28 @@ Core fields:
 - `created_at`
 - `updated_at`
 
-Problem order is preserved. `started_at` may be earlier than creation time;
-that difference becomes elapsed global time and is initially attributed to the
-first problem. Per-problem elapsed seconds are saved during tab switches,
-periodically, and on exit or completion.
+Problem order is preserved. `started_at` records the selected contest start:
+a future value waits, while a past value starts immediately and the global
+elapsed time includes the interval since that timestamp. That same interval
+is credited to the first problem, capped at the normal one-hour limit. The
+**Now** shortcut rounds forward to the next five-minute boundary. The
+`clock_elapsed_seconds` and `elapsed_by_problem_json` totals checkpoint
+at clock transitions. `clock_started_ms` anchors the current running segment
+(null means paused); `clock_seen_ms` bounds recovery if the browser stops
+checking in. `tracked_problem_id` follows the active judge URL independently
+of the statement tab (`active_problem_id`). A row revision serializes
+concurrent timer events and note saves. Only one unfinished session can be
+created at a time. Existing unfinished sessions with no clock fields are
+treated as paused at their last save.
 
-`notes_by_problem_json` is keyed by an existing problem ID and stores three
-strings: `approaches`, `lemmas`, and `analysis`. The MCP write path validates
-membership in `problem_ids_json`; it cannot create a problem row.
+The shared clock caps new per-problem time at 3,600 accumulated seconds,
+without capping the global timer or rewriting older saved totals.
+
+`notes_by_problem_json` is a contest snapshot keyed by an existing problem ID.
+New contests start from the canonical problem notes. Browser and MCP mashup
+edits merge only supplied fields into both records atomically; the MCP path
+validates membership and cannot create a problem. Deleting a mashup leaves the
+canonical problem notes intact.
 
 ## Dates
 

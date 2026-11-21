@@ -1,6 +1,6 @@
 # User interface
 
-The app opens on Due Today. Core views are ordered Due Today, Revise, Retry,
+The app opens on the pinned view, or Due Today if none is pinned. Core views are ordered Due Today, Revise, Retry,
 Resolve, All problems, then Pending AC and Archived; they cannot be deleted.
 User saved views are separate and deletable.
 
@@ -17,12 +17,14 @@ full-page problems.
 The current Sprint card is interactive. Opening it replaces the saved-view
 filter with the Sprint membership, sorts by Sprint due date, and exposes inline
 State, Status, and due-date editors. Visible columns persist when views change.
-The August view contains all 124 CP31 problems. Desktop rows and mobile cards
+The November view contains all 124 CP31 problems. Desktop rows and mobile cards
 in every view support selection; **Create mashup**
-opens the duration and backdated-start form, then a full-screen statement-only
-workspace with problem tabs, a global timer, per-tab timers, and Approaches,
-Lemmas, and Analysis fields. The table scrolls horizontally when all editable
-properties do not fit.
+opens the duration and start-time form, then a full-screen workspace with
+problem tabs, timers, and six autosaved notes fields. Refresh restores the
+unfinished mashup paused. Notes are also editable under **Practice notes** on
+the problem and prefill future mashups. The **#** column and mobile numbering
+reflect positions in the current sorted and filtered list. The table scrolls
+horizontally when all editable properties do not fit.
 
 ## Desktop
 

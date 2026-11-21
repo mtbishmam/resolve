@@ -2,10 +2,15 @@ import { z } from "zod";
 import { authorizeBrowserRequest } from "@/lib/auth";
 import {
   DifficultySchema,
+  PracticeNotesSchema,
   ProblemStateSchema,
   ProblemStatusSchema,
 } from "@/lib/contracts";
-import { getProblemById, updateProblemProperties } from "@/db/queries";
+import {
+  getProblemById,
+  updatePracticeNotes,
+  updateProblemProperties,
+} from "@/db/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +20,7 @@ const UpdateSchema = z
     difficulty: DifficultySchema.nullable().optional(),
     state: ProblemStateSchema.nullable().optional(),
     status: ProblemStatusSchema.nullable().optional(),
+    solvedOverride: z.boolean().nullable().optional(),
     archived: z.boolean().optional(),
     dueDate: z.string().date().nullable().optional(),
     sprintId: z.string().min(1).nullable().optional(),
@@ -22,6 +28,10 @@ const UpdateSchema = z
     officialTags: z.array(z.string().min(1).max(80)).max(100).optional(),
   })
   .strict();
+const PatchSchema = z.union([
+  z.strictObject({ practiceNotes: PracticeNotesSchema }),
+  UpdateSchema,
+]);
 
 export async function GET(
   request: Request,
@@ -46,7 +56,7 @@ export async function PATCH(
   if (!(await authorizeBrowserRequest(request))) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
-  const parsed = UpdateSchema.safeParse(await request.json());
+  const parsed = PatchSchema.safeParse(await request.json());
   if (!parsed.success) {
     return Response.json(
       { error: "Invalid properties", issues: parsed.error.issues },
@@ -54,7 +64,11 @@ export async function PATCH(
     );
   }
   const { id } = await context.params;
-  if (!(await updateProblemProperties(id, parsed.data))) {
+  const updated =
+    "practiceNotes" in parsed.data
+      ? await updatePracticeNotes(id, parsed.data.practiceNotes)
+      : await updateProblemProperties(id, parsed.data);
+  if (!updated) {
     return Response.json({ error: "Not found" }, { status: 404 });
   }
   return Response.json({ problem: await getProblemById(id) });

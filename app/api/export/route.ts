@@ -7,6 +7,7 @@ import {
   listSprints,
 } from "@/db/queries";
 import { getD1 } from "@/db/index";
+import { formatPracticeNotes } from "@/lib/practice-notes";
 
 export const dynamic = "force-dynamic";
 
@@ -53,6 +54,7 @@ export async function GET(request: Request) {
           reflection
             ? `## Reflection\n\n${reflection.summaryMarkdown}`
             : "## Reflection\n\nNot captured",
+          formatPracticeNotes(problem!.practiceNotes),
           `## Next review\n\n${problem!.nextReviewDate ?? "Not scheduled"}`,
         ]
           .filter(Boolean)
